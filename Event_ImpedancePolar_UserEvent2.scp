@@ -1,0 +1,29 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Impedance
+//HeaderImportExport<--
+{ ParamList for futhur use }
+
+procedure ImpedancePolar_UserEvent2(ParamList: TStringList);
+var
+  OpenFileDlg: TOpenDialog;
+begin
+  OpenFileDlg := TOpenDialog.Create(nil);
+
+  try
+    OpenFileDlg.Filter := 'Polar Import File(*.xml)|*.xml|All Files|*.*';
+    OpenFileDlg.DefaultExt := 'xml';
+//    OpenFileDlg.InitialDir := 'C:\Temp';
+
+    // Display dialog and check if the user has selected a file
+    if OpenFileDlg.Execute(nil) then
+    begin
+      if not Fnc.ImpedanceXmlImportPolar(OpenFileDlg.FileName) then
+        showmessage('Import Failed');
+    end;
+  finally
+    OpenFileDlg.Free;
+  end;
+end;

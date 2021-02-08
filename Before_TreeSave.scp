@@ -1,0 +1,26 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details Load / Save
+//HeaderImportExport<--
+//@# Rev: 1.4.0.1
+
+uses
+   UserLibrary;
+
+begin
+   Fnc.MouseBusy;
+
+   // *** Start Cimnet default functions
+
+   Fnc.TreeLoadSaveRegionalSettings('Save', false);
+
+//   Fnc.DrawLayupBitMapSaveToDataBase(0);    // Commented as it is not reqd. in 2.0
+
+   // *** End Cimnet default functions
+
+   UpdateJobAttributes;
+
+   Fnc.MouseNormal;
+end.

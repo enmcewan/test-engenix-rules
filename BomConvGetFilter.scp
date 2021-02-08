@@ -1,0 +1,328 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=BOM Conversion
+//HeaderImportExport<--
+function fixPanellength(OrgPanel: string): string;
+var IntLength: string; // used to check panel length/width length in no. of characters.
+begin
+  result := 1; // initialization.
+
+  IntLength := Int(OrgPanel); // check character length of panel height and width.
+
+  case Length(IntLength) of
+    0: Showmessage('Please check part attribute Panel Length or width');
+    1: result := '0' + IntToStr(IntLength); // IntToStr converts int to string
+    2: result := IntToStr(IntLength); // IntToStr converts int to string
+    3: result := ('Part attribute Panel Length or width is more than 99');
+  end;
+
+end;           
+
+ // change format of foil to cu wt. to one used in Data0017
+ // e.g. Change '3/8' to 'T';
+ // Cu Wt 3/8 is from Odb while 'T' is for Paradigm Data0017
+                       
+function SetCoreCuWt(CuWtfromTable: string): string;
+begin                                                          
+  case CuWtfromTable of                                
+    '': result := '1';
+    '.25': result := 'Q';
+    '1/4': result := 'Q';
+    '3/8': result := 'T';               
+    '.5': result := 'H';                  
+    '0.5': result := 'H';              
+    '1': result := '1';
+    '2': result := '2';                          
+    '3': result := '3';
+    '4': result := '4'
+      '6': result := '6'
+  else
+    result := '-';
+  end; // end of case
+
+  if result = '-' then
+    Showmessage('Please update procedure SetCoreCuWt in BomConversion script to map Cu Wt. with Core');
+
+end;
+                                   
+// Mandatory Cimnet function definition, do not change
+
+function BomConvSetFiltersForMaterial(FilterList: TStringList; MatrlRecId: integer);
+var
+  GroupFilter: string;
+  TightFilter: string;
+  PartLength: integer;
+  PanelLenght: integer;
+  FL_CuWt: string;
+  FL_PanelLength: string;
+  FL_PanelWidth: string;
+  CoreMatType1: string;
+  CoreMatType2: string;
+  CoreTopCuWt: string;
+  CoreBotCuWt: string;
+  CoreThickness: string;
+  Cr_PanelLength: string;
+  Cr_PanelWidth: string;
+  SetSingleTreat: string;
+  PP_MatType: string;
+  PP_No: Strin;
+  PP_PanelWidth: string;
+  PP_PanelLength: string;
+
+  Engx_CoreMatType,
+    Engx_CoreThickness,
+    Engx_CuWtTop,
+    Engx_CuTop,
+    Engx_CuWtBot,
+    Engx_CuBot: string;
+                                                
+begin
+ // ShowMessage(Fnc.SysGetAttrValue('PanelLength'));
+
+  //  Fnc.OpenDataGrid(Fnc.SysStackupTable, nil, nil, True);
+  //  Fnc.OpenDataGrid(Fnc.SysMaterialsTable, nil, nil, True);
+  //  Fnc.OpenDataGrid(Fnc.SysAttributeTable, nil, nil, True);
+                                  
+{
+  The user can check each Generic Bom Item what conversion filter should be assigned.
+  Checking can be done based on the BomTable as passed in, the filters should be assigned
+  to the TightFilter and GroupFilter
+
+  example: you can use one of the following fields, or any field in the BomTable:
+
+  - "ItemDesc" : this is the "Description" as defined in the MatetrialsType table
+}
+
+
+
+  GroupFilter := '';                     
+  TightFilter := '';
+
+  // Check for a Foil
+  // --> New method 1
+  if UpperCase(Fnc.SysStackupTable.FieldByName('ItemDesc').AsString) = 'FOIL' then
+  begin
+    FL_CuWt := '';
+
+    FL_PanelLength := fixPanellength(Fnc.SysFindAttrValue('PanelLength', true));
+    FL_PanelWidth := fixPanellength(Fnc.SysFindAttrValue('PanelWidth', true));
+
+    GroupFilter := '(Item LIKE' + QuotedStr('CF**') + ')';
+    case Fnc.GetStackupMaterialValue('TopLayer.LayupCodeThckCu') of
+      '3/8': FL_CuWt := 'T';
+      '0.5': FL_CuWt := 'H';
+      '.5': FL_CuWt := 'H';
+      '1': FL_CuWt := '1';
+      '4': FL_CuWt := '4';
+    else
+      Showmessage('Please update procedure GetFoilFilter in BomConversion script to map Cu Wt.');
+    end; // end of case
+
+    TightFilter := 'Item=' + QuotedStr('CF-' +
+      FL_CuWt +
+      '-' +
+      FL_PanelWidth +
+      FL_PanelLength);
+
+  end;
+     
+  // Check for a Core
+
+  // --> New method 2
+  if UpperCase(Fnc.GetStackupMaterialValue('ItemDesc')) = 'CORE' then
+  begin
+    GroupFilter := '(Item LIKE' + QuotedStr('L**') + ')';
+    
+    case Fnc.GetStackupMaterialValue('Family') of
+      'AR-25G': begin CoreMatType1 := 'AR-25G'; CoreMatType2 := 'AR-25G'; end;
+      'AR-25N': begin CoreMatType1 := 'AR-25N'; CoreMatType2 := 'AR-25N'; end;
+      'AR-31G': begin CoreMatType1 := 'AR-31G'; CoreMatType2 := 'AR-31G'; end;
+      'AR-31N': begin CoreMatType1 := 'AR-31N'; CoreMatType2 := 'AR-31N'; end;
+      'AR-33N': begin CoreMatType1 := 'AR-33N'; CoreMatType2 := 'AR-33N'; end;
+      'AR-527': begin CoreMatType1 := 'AR-527'; CoreMatType2 := 'AR-527'; end;
+      'AR-63N': begin CoreMatType1 := 'AR-63N'; CoreMatType2 := 'AR-63N'; end;
+      'AR-85N': begin CoreMatType1 := 'AR-85N'; CoreMatType2 := 'AR-85N'; end;
+      'AR1000': begin CoreMatType1 := 'AR1000'; CoreMatType2 := 'AR1000'; end;
+      'AR55NT': begin CoreMatType1 := 'AR55NT'; CoreMatType2 := 'AR55NT'; end;
+      'AR85NT': begin CoreMatType1 := 'AR85NT'; CoreMatType2 := 'AR85NT'; end;
+      'ARGTGT': begin CoreMatType1 := 'ARGTGT'; CoreMatType2 := 'ARGTGT'; end;
+      'BTEPOXY': begin CoreMatType1 := 'BTPOXY'; CoreMatType2 := 'BTPOXY'; end;
+      'FR4': begin CoreMatType1 := 'F4-FR4'; CoreMatType2 := 'FR-FR4'; end;
+      'GETEK': begin CoreMatType1 := 'GKGTEK'; CoreMatType2 := 'GKGTEK'; end;
+      'HTFR4': begin CoreMatType1 := 'HFHTF4'; CoreMatType2 := 'HFHTFR'; end;
+      'N4000-13': begin CoreMatType1 := 'N34013'; CoreMatType2 := 'N34013'; end;
+      'POLYIMIDE': begin CoreMatType1 := 'PYPOLY'; CoreMatType2 := 'PYPOLY'; end;
+      'AP8515': begin CoreMatType1 := 'AP8515'; CoreMatType2 := 'AP8515'; end;
+      'AP8525': begin CoreMatType1 := 'AP8525'; CoreMatType2 := 'AP8525'; end;
+      'AP8535': begin CoreMatType1 := 'AP8535'; CoreMatType2 := 'AP8535'; end;
+      'AP8555': begin CoreMatType1 := 'AP8555'; CoreMatType2 := 'AP8555'; end;
+      'AP8565': begin CoreMatType1 := 'AP8565'; CoreMatType2 := 'AP8565'; end;
+      'RO3003': begin CoreMatType1 := 'RO3003'; CoreMatType2 := 'RO3003'; end;
+      'RO3006': begin CoreMatType1 := 'RO3006'; CoreMatType2 := 'RO3006'; end;
+      'RO3010': begin CoreMatType1 := 'RO3010'; CoreMatType2 := 'RO3010'; end;
+      'RO3203': begin CoreMatType1 := 'RO3203'; CoreMatType2 := 'RO3203'; end;
+      'RO3210': begin CoreMatType1 := 'RO3210'; CoreMatType2 := 'RO3210'; end;
+      'RO4003': begin CoreMatType1 := 'RO4003'; CoreMatType2 := 'RO4003'; end;
+      'RO4350': begin CoreMatType1 := 'RO4350'; CoreMatType2 := 'RO4350'; end;
+      'RO435i': begin CoreMatType1 := 'RO435i'; CoreMatType2 := 'RO435i'; end;
+      'RO5780': begin CoreMatType1 := 'RO5780'; CoreMatType2 := 'RO5780'; end;
+      'RO5880': begin CoreMatType1 := 'RO5880'; CoreMatType2 := 'RO5880'; end;
+      'RO6002': begin CoreMatType1 := 'RO6002'; CoreMatType2 := 'RO6002'; end;
+      'RO6006': begin CoreMatType1 := 'RO6006'; CoreMatType2 := 'RO6006'; end;
+      'RO6010': begin CoreMatType1 := 'RO6010'; CoreMatType2 := 'RO6010'; end;
+      'TE-TLE': begin CoreMatType1 := 'TE-TLE'; CoreMatType2 := 'TE-TLE'; end;
+      'TTMM10': begin CoreMatType1 := 'TTMM10'; CoreMatType2 := 'TTMM10'; end;
+      'TTMM10i': begin CoreMatType1 := 'TTMM10i'; CoreMatType2 := 'TTMM10i'; end;
+      'TTMM3': begin CoreMatType1 := 'TTMM3'; CoreMatType2 := 'TTMM3'; end;
+      'TTTMM4': begin CoreMatType1 := 'TTTMM4'; CoreMatType2 := 'TTTMM4'; end;
+      'TX-TLX': begin CoreMatType1 := 'TX-TLX'; CoreMatType2 := 'TX-TLX'; end;
+      'TX-TLY': begin CoreMatType1 := 'TX-TLY'; CoreMatType2 := 'TX-TLY'; end
+    else
+      begin
+        CoreMatType1 := '-';
+        CoreMatType2 := '-';
+        Showmessage('Please update procedure SetCoreMatType in BomConversion script to map Material Type.');
+      end;
+    end; // end of case
+
+    CoreThickness:= IntToStr(Int(Fnc.GetStackupMaterialValue('ItemMatrlDesc') * 10000));
+    case Length(CoreThickness) of
+      '0': CoreThickness := '0000' + CoreThickness;
+      '1': CoreThickness := '000' + CoreThickness;
+      '2': CoreThickness := '00' + CoreThickness;
+      '3': CoreThickness := '0' + CoreThickness;
+      '4': CoreThickness := '' + CoreThickness
+    else
+      Showmessage('Length of Core Thickness is more than 4 characters long. Please Check Custom Table Core');
+    end;
+
+    CoreTopCuWt := SetCoreCuWt(Fnc.GetStackupMaterialValue('TopLayer.LayupCodeThckCu'));
+    CoreBotCuWt := SetCoreCuWt(Fnc.GetStackupMaterialValue('BottomLayer.LayupCodeThckCu'));
+
+    {Showmessage (Fnc.GetStackupMaterialValue('TopLayer.LayupCodeThckCu'));
+    Showmessage (Fnc.GetStackupMaterialValue('BottomLayer.LayupCodeThckCu'));
+    Showmessage (Fnc.GetStackupMaterialValue('ItemMatrlDesc'));
+        Fnc.OpenDatagrid(Fnc.SysMaterialsTable, nil, nil, true);
+        Fnc.OpenDatagrid(Fnc.SysStackupTable, nil, nil, true);
+    }
+
+{    Fnc.SysStackupGetCoreData('Core',
+      False,
+      Engx_CoreMatType,                                         
+      Engx_CoreThickness,   
+      Engx_CuWtTop,
+      Engx_CuTop,
+      Engx_CuWtBot,     
+      Engx_CuBot);
+
+ }
+ //   Fnc.SysStackupGetCoreData('Core', False, Engx_CoreMatType, Engx_CoreThickness, Engx_CuWtTop, Engx_CuTop, Engx_CuWtBot, Engx_CuBot);
+
+
+    Cr_PanelLength := fixPanellength(Fnc.SysFindAttrValue('PanelLength', true));
+    Cr_PanelWidth := fixPanellength(Fnc.SysFindAttrValue('PanelWidth', true));
+                         
+
+    SetSingleTreat := '';
+    // Added condition to check mfg. part level on 12/7/04
+    //Showmessage (Fnc.GetStackupMaterialValue('ItemMatrlDesc'));
+    if copy(Fnc.GetStackupMaterialValue('ItemMatrlDesc'), 1, 3) <> 'Top' then
+    begin
+      if Fnc.SysGetAttrValue('ST') = true then
+        SetSingleTreat := 'S';
+      if Fnc.SysGetAttrValue('RT') = true then
+        SetSingleTreat := 'R'
+      else
+        SetSingleTreat := 'S';
+    end;
+
+    GroupFilter := '(Item LIKE' + QuotedStr('L' + CoreMatType1 + '**') + ')';
+
+  //  if (CoreMatType1 <> '-') and (CoreMatType2 <> '-') then
+    TightFilter := '(Item=' + QuotedStr('L'
+      + CoreMatType1
+      + '-'
+      + CoreThickness
+      + CoreTopCuWt
+      + CoreBotCuWt
+      + '-'
+      + Cr_PanelWidth
+      + Cr_PanelLength
+      + SetSingleTreat)
+      + ')'
+      + 'or (Item=' + QuotedStr('L'
+      + CoreMatType2
+      + '-'
+      + CoreThickness
+      + CoreTopCuWt
+      + CoreBotCuWt
+      + '-'
+      + Cr_PanelWidth
+      + Cr_PanelLength
+      + SetSingleTreat)
+      + ')';
+    //Showmessage (TightFilter);  // debug statement
+    //Fnc.OpenDataGrid(Fnc.SysMaterialsFamilyTable);
+    //Fnc.OpenDataGrid(Fnc.SysGetSpecificBomCopy('JOHNNY')); 
+  end;
+
+  // Check for a Prepreg
+  // if pos(SFStkUpPrepreg, FieldByName('GenBomSysFlags').AsString) > 0 then begin
+  if (UpperCase(Fnc.SysStackupTable.FieldByName('ItemDesc').AsString) = 'PREPREG') or
+    (UpperCase(Fnc.SysStackupTable.FieldByName('ItemDesc').AsString) = 'PREPREG/FILLER') or
+    (UpperCase(Fnc.SysStackupTable.FieldByName('ItemDesc').AsString) = 'PP/FILLER') then
+  begin
+    //  Fnc.OpenDatagrid(Fnc.SysMaterialsTable, nil, nil, true);
+    //  Fnc.OpenDatagrid(Fnc.SysStackupTable, nil, nil, true);
+
+    // Change format of Prepreg material type to one used in Data0017
+    // Following function allows different material type name convention between Custom table and Paradigm Inv. part no.
+    case Fnc.GetStackupMaterialValue('Family') of
+      'HTFR4': PP_MatType := 'HTFR4';
+      'N4000-13': PP_MatType := 'N400013';
+      'BTEPOXY': PP_MatType := 'BTEPOXY';
+      'SPEED BD.C': PP_MatType := 'SPEED BD.C';
+      'RO4403': PP_MatType := 'RO4403';
+      'RO4450B': PP_MatType := 'RO4450B';                  
+      'POLYIMIDE': PP_MatType := 'POLYIMIDE';
+      'ARLON': PP_MatType := 'ARLON';
+    else
+      Showmessage('Please update procedure GetPrePregFilter in BomConversion script to map PrePreg Material Type');
+    end; // end of case
+                                                 
+    // Obtain Panel Length and Width from part attribute and convert them to 2 char. long string.
+    PP_PanelLength := fixPanellength(Fnc.SysFindAttrValue('PanelLength', true));
+    PP_PanelWidth := fixPanellength(Fnc.SysFindAttrValue('PanelWidth', true));
+    PP_No := Fnc.GetStackupMaterialValue('Description');
+    
+    if PP_No = '106' then PP_No := '0106';
+    
+    GroupFilter := 'Item LIKE' + QuotedStr('PP-' +
+      PP_MatType +                                                
+      '-' +           
+      PP_No +
+      '**'
+      ); 
+    TightFilter := 'Item=' + QuotedStr('PP-' +  
+      PP_MatType +                                                
+      '-' +
+      PP_No +
+      '-' + 
+      PP_PanelWidth +
+      PP_PanelLength);
+
+    //    GroupFilter := 'Item = ' + QuotedStr('10*');
+    //    if MatrlRecId > 0 then
+    //      TightFilter := 'Item = ' + QuotedStr(Fnc.GetStackupMaterialValue('Material.Description'))
+    //    else
+    //      TightFilter := 'Item = ' + QuotedStr('Got a Combo');
+    //  Showmessage (TightFilter);
+
+  end;
+
+  // pass back the results to the calling program
+  FilterList.Add('TightFilter=' + TightFilter);
+  FilterList.Add('GroupFilter=' + GroupFilter);
+end;

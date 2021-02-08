@@ -1,0 +1,13 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Drill Module
+//HeaderImportExport<--
+procedure DrillModule_PreEdit(ParamList: TStringList; tblDrillTools: TSysTable; tblLayers: TSysTable);
+begin
+ // ShowMessage(ParamList.Values['Options']);
+ //ParamList.Free;
+ ParamList.Add('VIA');
+ ParamList.Add('DUCK'); 
+end;                         

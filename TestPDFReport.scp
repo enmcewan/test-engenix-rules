@@ -1,0 +1,11 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+begin
+  //Fnc.SysGenerateReportAsPdf('Template_Stackup','','TopLayer L-1 / L-8', 'c:\temp\Stack.pdf');
+  if Fnc.SysGenerateReportAsPdf('Template_Stackup','','TopLayer L-1 / L-8', 'c:\temp\Stack.pdf') then
+    showmessage('Report Saved');
+end;                                                

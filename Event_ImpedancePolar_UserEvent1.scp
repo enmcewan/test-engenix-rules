@@ -1,0 +1,62 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Impedance
+//HeaderImportExport<--
+{ ParamList for futhur use }
+
+procedure ImpedancePolar_UserEvent1(ParamList: TStringList);
+var
+  UnitId: integer;
+  TempTable: TSysTable;
+begin
+{
+  Set the UnitId how we want to see the data, 0 = display unit in Polar Gui,
+  for other units see the Config.Manager -> Units -> Units -> Unit Definition.
+
+  Be sure that you use the same UnitId for the Fnc.GetPolarImpedanceTable(....)
+  and Fnc.UpdatePolarImpedanceTable(.....) function
+}
+  UnitId := 0;
+
+  // fetch the Polar data
+  TempTable := Fnc.GetPolarImpedanceTable(UnitId);
+
+  //Fnc.OpenDataGrid(TempTable);
+
+{
+  .....
+  .....
+  do your processing here, following fields can be updated
+
+  Design -> Width1 ............. TempTable.FieldByName('DesignLineWidth1').AsFloat
+  Design -> Width2 ............. TempTable.FieldByName('DesignLineWidth2').AsFloat
+
+  Actual -> Width1 ............. TempTable.FieldByName('LineWidth1').AsFloat
+  Actual -> Width2 ............. TempTable.FieldByName('LineWidth1').AsFloat
+
+  Plotted -> Width1 ............ TempTable.FieldByName('PlottedWidth1').AsFloat
+  Plotted -> Width2 ............ TempTable.FieldByName('PlottedWidth2').AsFloat
+  Plotted -> Space1 ............ TempTable.FieldByName('PlottedSpace1').AsFloat
+  Plotted -> Space2 ............ TempTable.FieldByName('PlottedSpace2').AsFloat
+
+  Pitch/Offset -> D1/O1 ........ TempTable.FieldByName('PitchOffset1').AsFloat
+  Pitch/Offset -> S1 ........... TempTable.FieldByName('PitchOffset2').AsFloat
+  Pitch/Offset -> Line-Line .... TempTable.FieldByName('TraceToTracePitch').AsFloat
+  Pitch/Offset -> Line-Ground .. TempTable.FieldByName('TraceToGroundPitch').AsFloat
+
+  ....
+  ....
+}
+  TempTable.Edit;
+  TempTable.FieldByName('PitchOffset1').AsFloat :=  TempTable.FieldByName('PitchOffset1').AsFloat + 1.00;
+  TempTable.Post;
+  // update the internal Engenix Polar tables
+  Fnc.UpdatePolarImpedanceTable(TempTable, UnitId);
+
+  // free the memory of the temp table
+  Fnc.SysTableDestroy(TempTable);
+end;
+
+

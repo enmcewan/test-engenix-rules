@@ -1,0 +1,42 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+procedure ArrayTest;
+var
+  SpecialBit : Array [0..21] of float;
+begin
+  ShowMessage('ArrayTest');
+  SpecialBit[1]:= 0.625;
+  SpecialBit[2]:= 0.875;
+  SpecialBit[3]:= 0.914;
+  SpecialBit[4]:= 0.925;
+  SpecialBit[5]:= 1.075;
+  SpecialBit[6]:= 1.125;
+  SpecialBit[7]:= 1.325;
+  SpecialBit[8]:= 1.375;
+  SpecialBit[9]:= 1.475;
+  SpecialBit[10]:= 1.575;
+  SpecialBit[11]:= 1.625;
+  SpecialBit[12]:= 1.675;
+  SpecialBit[13]:= 1.875;
+  SpecialBit[14]:= 2.025;
+  SpecialBit[15]:= 2.125;
+  SpecialBit[16]:= 2.527;
+  SpecialBit[17]:= 2.575;
+  SpecialBit[18]:= 3.025;
+  SpecialBit[19]:= 3.175;
+  SpecialBit[20]:= 4.025;
+  SpecialBit[21]:= 4.772;
+end;
+
+procedure Callme;
+begin
+  ArrayTest;
+end;
+
+begin
+ Callme;
+end;

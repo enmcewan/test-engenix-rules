@@ -1,0 +1,178 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Route Gen/Regen
+//HeaderImportExport<--
+{
+  Script runs after the selected, tagged or all Mfg.Part RouteGen/ReGen has finished
+
+   MfgPartList.Names[i] = MfgPart Name
+
+   MfgPartList.Values[MfgPartName] = Status for RouteGen/ReGen
+   - Blocked
+   - Aborted
+   - Skip
+   - Success
+
+   ParamList = future use
+}
+
+function ValidateRouteGen(MfgPartList: TStringList): boolean;
+var
+  i: integer;
+begin
+  Result := True;
+
+  for i := 0 to MfgPartList.Count - 1 do
+  begin
+    Result := LowerCase(MfgPartList.Values[MfgPartList.Names[i]]) <> 'aborted';
+    if not Result then
+      break;
+  end;
+end;
+
+procedure ProcessCopperRollup_TopLayer(CopperTable: TSysTable);
+var
+  SaveRecId: integer;
+  LayerName: string;
+  CodeThckCu: string;
+
+  Copper_Diff: double;
+  Copper_Thck: double;
+begin
+  SaveRecId := CopperTable.FieldByName('RecId').AsInteger;
+  LayerName := CopperTable.FieldByName('LayerMatrlTop').AsString;
+
+  //Fnc.OpendataGrid(CopperTable);
+
+  Copper_Diff := 0.0;
+  Copper_Thck := CopperTable.FieldByName('RouteStepCopperThickTop').AsFloat;
+
+  if Copper_Thck = 0.0 then
+  begin
+    CodeThckCu := Fnc.SysGetLayerAttrValue(LayerName, 'LayupCodeThckCu');
+    if CodeThckCu <> '' then
+      Copper_Thck := Fnc.SysGetConductorBaseValue('Copper', CodeThckCu, 'Thickness');
+  end;
+
+  repeat
+    Copper_Diff := Copper_Diff + CopperTable.FieldByName('RouteStepCopperThickDiffTop').AsFloat;
+//@@    Copper_Thck := Copper_Thck + CopperTable.FieldByName('RouteStepCopperThickDiffTop').AsFloat;
+    Copper_Thck := CopperTable.FieldByName('RouteStepCopperThickTop').AsFloat;
+
+    // update current record
+    CopperTable.Edit;
+    CopperTable.FieldByName('TopDone').AsBoolean := True;
+    CopperTable.FieldByName('RouteStepCopperThickTotalTop').AsFloat := Copper_Thck;
+    CopperTable.FieldByName('RouteStepCopperThickDiffTotalTop').AsFloat := Copper_Diff;
+    CopperTable.Post;
+
+    if  CopperTable.FieldByName('LayerImageTop').AsString = LayerName then
+      break;
+
+  until not CopperTable.Locate('RecId', CopperTable.FieldByName('RecIdParent').AsInteger, SetOf([]));
+
+  CopperTable.Locate('RecId', SaveRecId, SetOf([]));
+end;
+
+procedure ProcessCopperRollup_BottomLayer(CopperTable: TSysTable);
+var
+  SaveRecId: integer;
+  LayerName: string;
+  CodeThckCu: string;
+
+  Copper_Diff: double;
+  Copper_Thck: double;
+begin
+  SaveRecId := CopperTable.FieldByName('RecId').AsInteger;
+  LayerName := CopperTable.FieldByName('LayerMatrlBottom').AsString;
+
+  Copper_Diff := 0.0;
+  Copper_Thck := CopperTable.FieldByName('RouteStepCopperThickBottom').AsFloat;
+
+  if Copper_Thck = 0.0 then
+  begin
+    CodeThckCu := Fnc.SysGetLayerAttrValue(CopperTable.FieldByName('LayerMatrlBottom').AsString, 'LayupCodeThckCu');
+    Copper_Thck := Fnc.SysGetConductorBaseValue('Copper', CodeThckCu, 'Thickness');
+  end;
+
+  repeat
+    Copper_Diff := Copper_Diff + CopperTable.FieldByName('RouteStepCopperThickDiffBottom').AsFloat;
+//@@    Copper_Thck := Copper_Thck + CopperTable.FieldByName('RouteStepCopperThickDiffBottom').AsFloat;
+    Copper_Thck := CopperTable.FieldByName('RouteStepCopperThickBottom').AsFloat;
+                               
+    // update current record
+    CopperTable.Edit;
+    CopperTable.FieldByName('BottomDone').AsBoolean := True;
+    CopperTable.FieldByName('RouteStepCopperThickTotalBottom').AsFloat := Copper_Thck;
+    CopperTable.FieldByName('RouteStepCopperThickDiffTotalBottom').AsFloat := Copper_Diff;
+    CopperTable.Post;
+
+    if  CopperTable.FieldByName('LayerImageBottom').AsString = LayerName then
+      break;
+
+  until not CopperTable.Locate('RecId', CopperTable.FieldByName('RecIdParent').AsInteger, SetOf([]));
+
+  CopperTable.Locate('RecId', SaveRecId, SetOf([]));
+end;
+
+procedure ProcessCopperRollup(MfgPartList: TStringList);
+var
+  CopperTable: TSysTable;
+begin
+  if ValidateRouteGen(MfgPartList) then
+  begin
+    CopperTable := Fnc.SysGetCopperCalcMfgPart;
+
+    CopperTable.SortOptions := SetOf([mtcoDescending]);
+    CopperTable.SortFields := 'Level;RecIdParent';
+    CopperTable.SortDefault;
+
+    CopperTable.First;
+
+    while not CopperTable.Eof do
+    begin
+
+      // processing top-side layers
+      if not CopperTable.FieldByName('TopDone').AsBoolean then
+      begin
+        if CopperTable.FieldByName('LayerMatrlTop').AsString <> '' then
+          ProcessCopperRollup_TopLayer(CopperTable);
+      end;
+
+      // processing bottom-side layers
+      if not CopperTable.FieldByName('BottomDone').AsBoolean then
+      begin
+        if CopperTable.FieldByName('LayerMatrlBottom').AsString <> '' then
+          ProcessCopperRollup_BottomLayer(CopperTable);
+      end;
+
+      CopperTable.Next;
+    end;                      
+
+    CopperTable.SortOptions := SetOf([]);
+    CopperTable.SortFields := '';
+    CopperTable.SortDefault;
+
+    Fnc.SysSetCopperCalcMfgPart(CopperTable, true, true);
+
+    Fnc.SysTableDestroy(CopperTable);
+  end;
+end;
+
+procedure DisplayCopperTable;
+var
+  CopperTable: TSysTable;
+begin
+  CopperTable := Fnc.SysGetCopperCalcMfgPart;
+  //Fnc.OpenDataGrid(CopperTable);
+  Fnc.SysTableDestroy(CopperTable);
+end;
+
+procedure RouteBatch_PostProcess(MfgPartList: TStringList; ParamList: TStringList);
+begin
+//  DisplayCopperTable;
+//ProcessCopperRollup(MfgPartList);
+end;
+

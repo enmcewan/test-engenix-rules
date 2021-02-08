@@ -1,0 +1,92 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=New
+//HeaderImportExport<--
+Function GetPlatingThickness(Thickness, PTH, PTHSpec, Laser, LaserDia, LaserSpec, LaserMat, Technology, AddReqs: string): float;
+var
+  Excelquery: TadoQuery;
+//  Thickness, PTH, PTHSpec, Laser, LaserDia, LaserSpec, LaserMat, Technology, AddReqs: string;
+  //PlatedThickness: double;
+begin
+  // Create the Query object
+  Excelquery := TadoQuery.Create(nil);
+  // Specify the Excel file we want to read
+  Excelquery.ConnectionString := 'Provider=Microsoft.Jet.OLEDB.4.0' +
+    ';Data Source =c:\Plating\Plated Cu thickness_HDI.xls' +
+    ';Extended Properties=Excel 8.0';
+  // Be sure the Query is closed, and clear the Sql command string
+  Excelquery.Close;
+  Excelquery.Sql.Clear;
+  // Specify the Sql command, can be spread over multiple ‘Add’ lines
+  Excelquery.Sql.Add('SELECT * FROM [D.(SSS.H.Kapitel 5.9)-01G$]');
+  // Open the Query, this will open the Excel file, and get the data from the specified sheet
+  Excelquery.Open;
+  // Show what we have got
+  //Fnc.OpenDataGrid(Excelquery);
+
+{  Thickness := '> 0,3 mm';
+  PTH := '---';
+  PTHSpec := '---';
+  Laser := '---';
+  LaserDia := '---';
+  LaserSpec := '---';
+  LaserMat := '---';
+  Technology := 'Filled Via';
+  AddReqs := '';
+}
+
+//  PlatedThickness := 0;
+
+  with Excelquery do
+  begin
+    first;
+    next; //skip header
+    next; //skip header
+
+    while not Eof do
+    begin
+      //ShowMessage(FieldByName('F3').AsString);
+      //ShowMessage(FieldByName('F4').AsString);
+
+      if (trim(FieldByName('F3').AsString) = Thickness) and
+         (trim(FieldByName('F4').AsString) = PTH) and
+         (trim(FieldByName('F5').AsString) = PTHSpec) and
+         (trim(FieldByName('F6').AsString) = Laser) and
+         (trim(FieldByName('F7').AsString) = LaserDia) and
+         (trim(FieldByName('F8').AsString) = LaserSpec) and
+         (trim(FieldByName('F9').AsString) = LaserMat) and
+         (trim(FieldByName('F10').AsString) = Technology) and
+         (trim(FieldByName('F11').AsString) = AddReqs) then
+      begin
+        result := FieldByName('F13').AsFloat;
+        ShowMessage(result);
+        Break;
+      end;
+      Next;
+    end;
+  end;
+
+ // Cleanup things if no longer needed
+  Excelquery.Close;
+  Excelquery.Free;
+end;
+
+
+begin
+
+  GetPlatingThickness
+  (
+  '> 0,3 mm',
+  '---',
+  '---',
+  '---',
+  '---',
+  '---',
+  '---',
+  'Filled Via',
+  ''
+  );
+
+end

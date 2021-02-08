@@ -1,0 +1,61 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+{
+  The parameter name to specify the header data has the following format:
+
+    StackupHeaderXY
+
+  X = line (1, 2, ....)
+  Y = position in line (1 = first, 2= second, ....)
+
+  The parameter value has the format:
+
+    xxxx: yyyyy
+
+  'xxxx:' will always printed bold, no need to have a space between the ':' and the
+  next character. If there is no ':' then the full value will be printed normal
+}
+procedure FillJobData(ParamList: TStringList);
+var
+  JobDataList: TStringList;
+begin
+  JobDataList := Fnc.GetJobData;
+
+  // first line of the header
+  ParamList.Values['StackupHeader11'] := 'Customer:' + JobDataList.Values['CustomerName'];
+  ParamList.Values['StackupHeader12'] := 'PartNumber:' + JobDataList.Values['PartNumberName'];
+  ParamList.Values['StackupHeader13'] := 'Rev:' + JobDataList.Values['PartRevision'];
+
+  // second line of the header
+  ParamList.Values['StackupHeader21'] := 'JobName:' + JobDataList.Values['JobName'];
+  ParamList.Values['StackupHeader22'] := 'Rev:' + JobDataList.Values['Revision'];
+
+  JobDataList.Free;
+end;
+
+var
+  i: integer;
+  aList: TStringList;
+  ParamList: TStringList;
+begin
+  ParamList := TStringList.Create;
+
+  FillJobData(ParamList);
+
+  aList := Fnc.SysGetListOfAllMfgPartNames;
+
+  for i := 0 to aList.Count - 1 do
+  begin
+    ParamList.Values['StackupHeader23'] := 'MfgPart:' + aList.Strings[i];
+    Fnc.SysCreateGraphicFile('Stackup', aList.Strings[i], 'JPeg', Format('C:\Temp\Stackup_%d.jpg', [i+1]), True, ParamList);
+  end;
+
+  aList.Free;
+  ParamList.Free;
+end;
+
+

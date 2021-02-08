@@ -1,0 +1,28 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details User Event Scripts
+//HeaderImportExport<--
+procedure StackupUserEvent4(ParamList: TStringList);
+var
+  OptionList: TStringList;
+  aQry: TAdoQuery;
+begin
+  aQry := TAdoQuery.Create(nil);
+  aQry.Connection := Fnc.DBConnection;
+                                                                                                                                                      
+  aQry.Sql.Add('Select JobId, JobName, Revision From Jobs Order By JobName');
+  aQry.Active := True;
+
+  OptionList := TStringList.Create;
+  OptionList.Add('ShowExportToCSV=True'); 
+
+  Fnc.OpenDataGrid(aQry, OptionList);
+
+  OptionList.Free;
+
+  aQry.Active := False;
+  aQry.Free;
+end;    
+

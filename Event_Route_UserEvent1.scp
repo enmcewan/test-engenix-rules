@@ -1,0 +1,15 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Route Gen/Regen
+//HeaderImportExport<--
+uses
+  ParadigmLibrary;
+
+
+
+procedure RouteUserEvent1(ParamList: TStringList);
+begin
+ UpdateJobDataFromParadigm;
+end;

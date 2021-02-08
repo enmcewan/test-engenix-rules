@@ -1,0 +1,14 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+var
+  ImpTable : TSystable;
+begin
+  ImpTable := Fnc.GetPolarImpedanceTable(1);
+  //Fnc.OpenDataGrid(ImpTable);
+ 
+
+end;

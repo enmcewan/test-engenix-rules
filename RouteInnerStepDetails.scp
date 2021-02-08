@@ -1,0 +1,50 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+uses
+  Event_RouteGenLibrary; //Route System Scripts
+
+procedure InnSurfPrepDetails;
+Var
+ sInstr440 : string;
+ sInstr1064 : string;
+begin
+  SysRouteInsDepartment('Erp', 'SURFAC-D', '');
+  SysRouteInsWorkCenter('Erp', 'ACID', '');
+  SysRouteInsInstruction('Erp', 'SUR005', '');
+
+  sInstr440 := '0123456789012345678901234567890123456789SysRouteInsInstruction';
+  SysRouteInsInstruction('', sInstr440, '');
+end;
+
+procedure ResistStripDetails;
+begin
+  SysRouteInsDepartment('Erp', 'RESSTR-D', '');
+  SysRouteInsWorkCenter('Erp', 'RESSTR-D', '');
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 1.08, '');
+end;
+
+procedure PEPStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'PEPUNC-D', '');
+  SysRouteInsWorkCenter('Erp', 'PEPUNC-D', '');
+end;
+
+procedure AOIStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'IPINSP-C', '');
+  SysRouteInsWorkCenter('Erp', 'IPCAMTEK', '');
+  SysRouteInsInstruction('Erp', 'INS018', '');
+  SysRouteInsInstruction('Erp', 'INS018', '');
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 0.18, '');
+  SysRouteInsCrpParameter('Erp', 400, 100, 30.0, '');
+end;
+
+procedure OxideStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'OXIDE-D   ', '');
+  SysRouteInsWorkCenter('Erp', 'OXIDE-WC   ', '');
+end;

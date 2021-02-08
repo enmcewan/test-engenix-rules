@@ -1,0 +1,33 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details Load / Save
+//HeaderImportExport<--
+//@# Rev: 1.4.0.1
+
+var
+   ParamList: TStringList;
+begin
+   Fnc.MouseBusy;
+
+   // *** Start Cimnet Procedures
+
+  // Fnc.SysCopyDefaultAttributes; // Commented as it is not reqd. in 2.0
+
+   Fnc.TreeLoadSaveRegionalSettings('Load', false);
+
+  // Fnc.TreeLoadCheckAttrDef(false);
+
+   // Check Spec/Cap revision & load
+   ParamList := TStringList.Create;
+   ParamList.Add('Function=CheckRevision');
+  // Fnc.SpecCapabilityProcessing(ParamList);
+   ParamList.Free;
+
+   //Fnc.DrawLayupBitMap(True); // Commented as it is not reqd. in 2.0
+
+   // *** End Cimnet Procedure
+
+   Fnc.MouseNormal;
+end;

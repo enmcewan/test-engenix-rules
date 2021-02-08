@@ -1,0 +1,445 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+// Created by Iain Wilson 06/15/04
+// Rev 01
+// Based on Visio Standard Board Flow diagram
+// The script will contain the flow only. Step Details & Instructions
+// ... will be in additional scripts.
+
+// Updated 7/20 by Iain & Karen. Fixed Electro Gold Rules.
+
+uses
+  Event_RouteGenLibrary, //Route System Scripts
+  RouteFunctions,
+  Eng_RouteFunctions; // Route User Scripts
+// RouteInnerStepDetails, RouteCommonStepDetails, RouteOuterStepDetails,
+var
+  SMONLY: boolean;
+
+procedure HDITYPE1;
+begin
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  SysRouteInsertStep('RES.STRIP');
+  SysRouteInsertStep('SILVER FILL');
+  SysRouteInsertStep('SAND_SURFACE');
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  SysRouteInsertStep('Ni/AuFlash');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+  SysRouteInsertStep('AuOnly');
+
+end;
+
+procedure HDITYPE2;
+begin
+  SysRouteInsertStep('OUTER_SUR. PREP');
+
+  SysRouteInsertStep('RES.STRIP');
+  SysRouteInsertStep('SILVER FILL');
+  SysRouteInsertStep('SAND_SURFACE');
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  SysRouteInsertStep('Ni/AuFlash');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+  SysRouteInsertStep('AuOnly');
+
+end;
+
+procedure InnerLayerFlow;
+begin
+  //ShowMessage('INNER FLOW');
+  SysRouteInsertStep('CAM');
+  SysRouteInsertStep('MAT.PREP');
+  SysRouteInsertStep('INNER_SUR.PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+  SysRouteInsertStep('ETCH');
+  if (Fnc.SysGetAttrValue('InnImpLine') <> '') and
+    (Fnc.SysGetAttrValue('InnImpLine') <> null) then
+  begin
+    SysRouteInsAttribute('ERP', 'IMP.LINE', Fnc.SysGetAttrValue('InnImpLine'), '');
+    SysRouteInsAttribute('ERP', 'IMP.LINE TOL.', Fnc.SysGetAttrValue('ImpLineTol'), '');
+  end;
+  SysRouteInsertStep('RES.STRIP');
+  SysRouteInsertStep('PEP');
+  SysRouteInsertStep('AOI');
+  //Single Treat?
+  if fnc.SysGetAttrValue('ST') = true then
+    SysRouteInsertStep('OXIDE');
+  //End of Simple Inner Layers Route
+end;
+
+procedure ToolFlow;
+begin
+  SysRouteInsertStep('MAT.PREP');
+  SysRouteInsertStep('SECDRILL');
+  SysRouteInsertStep('POWERWASH');
+  SysRouteInsertStep('IN-PROCESS');
+
+end;
+
+procedure DSOuterSubFlow;
+begin
+  SysRouteInsertStep('CAM');
+  SysRouteInsertStep('MAT.PREP');
+  GetFinish; //   From Route Functions
+
+  //only if # of layers > 2 (For Sub & ML)
+  GetLayerCount; //From Route Functions
+  if LayerCount > 2 then
+  begin
+    SysRouteInsertStep('ML_WAIT');
+    SysRouteInsertStep('ML_LAYUP');
+    SysRouteInsertStep('LAMINATION');
+  end;
+
+  SysRouteInsertStep('DRILL');
+  if (fnc.SysGetAttrValue('SmallDrill') < 11) then
+  begin
+    SysRouteInsertStep('INSPECTHOLES');
+  end;
+  SysRouteInsertStep('HOLE_PREPA');
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  if (fnc.SysGetAttrValue('SmallDrill') < 11) then
+  begin
+    SysRouteInsertStep('INSPECTHOLES');
+  end;
+  SysRouteInsertStep('HDI');
+
+  if fnc.SysGetAttrValue('Allentown') = true then
+  begin
+    if (fnc.SysGetAttrValue('SF') = 'TopSideFlat') or
+      (fnc.SysGetAttrValue('SF') = 'BotSideFlat') or
+      (fnc.SysGetAttrValue('SF') = 'Both') then
+    begin
+      SysRouteInsertStep('CuPLATE');
+      SysRouteInsertStep('INSPECTHOLES');
+      SysRouteInsertStep('SILVER FILL');
+      SysRouteInsertStep('SAND_SURFACE');
+    end
+    else
+    begin
+      if ((Fnc.SysGetAttrValue('ENAHardGold') = true) and
+        (fnc.SysGetAttrValue('LayupThickness') >= 150)) then
+      begin
+        SysRouteInsertStep('CuFLASH');
+      end;
+    end;
+  end;
+
+  //If true blind vias exist
+  if (CheckBlindDrill(1) = true) then
+  begin
+    SysRouteInsertStep('LASERDRILL');
+  end;
+
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  //If Silver Fill is True
+  //ShowMessage(fnc.SysGetAttrValue('SF'));
+  if fnc.SysGetAttrValue('Allentown') <> true then
+    if (fnc.SysGetAttrValue('SF') = 'TopSideFlat') or
+      (fnc.SysGetAttrValue('SF') = 'BotSideFlat') or
+      (fnc.SysGetAttrValue('SF') = 'Both') then
+    begin
+      // SysRouteInsertStep('CuPLATE');
+      SysRouteInsertStep('RES.STRIP');
+      SysRouteInsertStep('SILVER FILL');
+      SysRouteInsertStep('SAND_SURFACE');
+      SysRouteInsertStep('OUTER_SUR. PREP');
+      SysRouteInsertStep('LAM');
+      SysRouteInsertStep('EXP');
+      SysRouteInsertStep('DEV');
+    end;
+
+  //Point 'C' on Flowchart
+  SysRouteInsertStep('CuPLATE');
+  //Electroless Ni/Au?
+  if Finish = 'ElectroNickelGold' then
+    if fnc.SysGetAttrValue('ThinThick') = true then
+    begin
+      SysRouteInsertStep('Ni/AuFlash');
+      SysRouteInsertStep('LAM');
+      SysRouteInsertStep('EXP');
+      SysRouteInsertStep('DEV');
+      SysRouteInsertStep('AuOnly');
+    end
+    else
+      SysRouteInsertStep('Ni/Au');
+
+  //ShowMessage (Finish);
+
+  // If there are blind/buried vias with Dot Shots
+  if fnc.SysGetAttrValue('PltDotShotBB') = true then
+  begin
+    SysRouteInsertStep('RES.STRIP');
+    SysRouteInsertStep('SAND_SURFACE');
+    SysRouteInsertStep('OUTER_SUR. PREP');
+    SysRouteInsertStep('LAM');
+    SysRouteInsertStep('EXP');
+    SysRouteInsertStep('DEV');
+    SysRouteInsertStep('ETCH');
+    SysRouteInsertStep('RES.STRIP');
+  end;
+
+  if ((fnc.SysGetAttrValue('PltDotShotBB')) = true) or
+    (Finish = 'ElectroNickelGold') then
+  begin
+  end
+  else
+    SysRouteInsertStep('ELECT. TIN');
+
+  if fnc.SysGetAttrValue('PltDotShotBB') = false then
+  begin
+    SysRouteInsertStep('RES.STRIP');
+
+    if (fnc.SysGetAttrValue('Allentown') = true) and
+      (fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType = ('Sub')) then
+    begin
+      SysRouteInsertStep('LAM');
+    end;
+
+    SysRouteInsertStep('ETCH');
+    if (Fnc.SysGetAttrValue('OutImpLine') <> '') and
+      (Fnc.SysGetAttrValue('OutImpLine') <> null) then
+    begin
+      SysRouteInsAttribute('ERP', 'IMP.LINE', Fnc.SysGetAttrValue('OutImpLine'), '');
+      SysRouteInsAttribute('ERP', 'IMP.LINE TOL.', Fnc.SysGetAttrValue('ImpLineTol'), '');
+    end;
+    if (fnc.SysGetAttrValue('Allentown') = true) and
+      (fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType = ('Sub')) then
+    begin
+      SysRouteInsertStep('RES.STRIP');
+    end;
+  end;
+  //if fnc.SysGetAttrValue ('OutImpLine') <> '' then
+  // begin
+  //   SysRouteInsAttribute('Erp', 'Fin.Imp.Line', fnc.SysGetAttrValue('OutImpLine'), '');
+  // end;
+
+  if ((fnc.SysGetAttrValue('PltDotShotBB')) = true) or
+    (Finish = 'ElectroNickelGold') then
+  begin
+  end
+  else
+    SysRouteInsertStep('TIN STRIP');
+
+  if (MfgPartType <> 'Sub') and
+    (MfgPartType <> 'Inn') then
+    //      GetLayerCount; //From Route Functions
+  begin
+    if LayerCount > 2 then
+      SysRouteInsertStep('ET');
+  end;
+
+  // Search For Solder Masks
+  FindSM; //From Route Functions
+  if fnc.SysGetAttrValue('SMSIDES') > 0 then
+  begin
+    SysRouteInsertStep('FINISH_SUR.PREP');
+    SysRouteInsertStep('S/M');
+    SMONLY := true; //switch for Expose Step
+    SysRouteInsertStep('EXP');
+    SysRouteInsertStep('DEV');
+
+    if (fnc.SysGetAttrValue('Allentown') = true) and
+      (fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType = ('Sub')) then
+    begin
+      SysRouteInsertStep('ROUT');
+    end;
+
+    SysRouteInsertStep('S/M CURE');
+  end;
+
+  if Finish = 'HASL' then
+    SysRouteInsertStep('HASL');
+  if Finish = 'ImmersionGold' then
+    SysRouteInsertStep('IMM.Au');
+  if Finish = 'ImmersionSilver' then
+    SysRouteInsertStep('IMM.Silver');
+
+  //Search For Legends
+  FindLegend; //From Route Functions
+  if Legend <> 0 then
+  begin
+    SysRouteInsertStep('SCREEN LEGEND');
+  end;
+
+  if Finish = 'ImmersionTin' then
+    SysRouteInsertStep('IMM. TIN');
+
+  if (MfgPartType <> 'Sub') and
+    (MfgPartType <> 'Inn') then
+  begin
+    if LayerCount > 2 then
+    begin
+      SysRouteInsertStep('ET');
+    end;
+
+    if fnc.SysGetAttrValue('NumImpTest') > 0 then
+    begin
+      SysRouteInsertStep('TDR');
+    end;
+
+    if fnc.SysGetAttrValue('NumStepsPanel') > 10 then
+    begin
+      SysRouteInsertStep('IN-PROCESS');
+    end;
+
+    if not Fnc.SysJobHasTopAssyMfgPart then
+    begin
+      SysRouteInsertStep('ROUT');
+      SysRouteInsertStep('FINAL');
+      SysRouteInsertStep('SHIP');
+    end;
+  end
+  else
+  begin
+    if fnc.SysGetAttrValue('ST') = true then
+      SysRouteInsertStep('OXIDE');
+  end;
+  if (fnc.SysGetAttrValue('FoundDrillFile') = true) and (MfgPartType <> 'Top') then
+  begin
+    SysRouteInsertStep('AOI');
+    SysRouteInsertStep('OXIDE');
+  end;
+end;
+
+procedure RigidFlex;
+var
+  rf_DrillList : TStringList;
+  rf_DrillData : TSysTable;
+  rf_MatList : TStringList;
+begin
+  //ShowMessage('Rigid-Flex');
+  rf_DrillList := TStringList.Create;
+  rf_DrillList := Fnc.SysRouteGenRF_GetLinkedDrillNames(Fnc.SysRouteGenRF_MfgPartName);
+  //ShowMessage(rf_DrillList.text);
+
+  //rf_DrillData := Fnc.SysRouteGenRF_GetLinkedDrillData(Fnc.SysRouteGenRF_MfgPartName);
+  //Fnc.OpenDataGrid(rf_DrillData);
+
+  rf_MatList := TStringList.Create;
+  rf_MatList := Fnc.SysRouteGenRF_GetMatrlListRigidFlexCurrentLevel;
+    //ShowMessage(rf_MatList.text);
+
+  //ShowMessage(Fnc.SysGetAttrValueMfgPartRawMatrl(Fnc.SysRouteGenRF_MfgPartName, 'ProdCode'));
+
+  SysRouteInsertStep('MAT.PREP');
+  SysRouteInsertStep('DRILL');
+  SysRouteInsertStep('ROUT');
+
+  rf_DrillList.free;
+  rf_DrillData.close;
+  rf_DrillData.free;
+end;
+
+procedure FlowSelect;
+var
+  rFList : TStringList;
+  aTable : TSysTable;
+begin
+  //ShowMessage('Generating Route...');
+  fnc.SysSetAttrValue('RuleVer', 1.0);
+  //SysRouteInsertStep('MAT.PREP');
+  SMONLY := false; //setting switch for EXP Step
+  // Fnc.SysSetAttrValue('MfgPartType', MfgPartType); //From RouteFunctions script
+
+  aTable := Fnc.SysRouteGenGetStatusMfgParts();
+  //Fnc.OpenDataGrid(aTable);
+  Fnc.SysTableDestroy(aTable);
+
+  ///ShowMessage(Fnc.SysGetMfgPartAttrValueExt2('Assembly', cStackupMfgTopAssy, 'ProdCode'));   
+  if Fnc.SysRouteGenRF_isRigidFlex then
+    RigidFlex;
+  else
+  begin
+    rFList := TStringList.Create;
+    //rFList := Fnc.SysRouteGenRF_GetMatrlListRigidFlexCurrentLevel;
+    //ShowMessage(rFList.text);
+
+    if MfgPartType <> 'Too' then
+    begin
+      // Engx_ScanBom;
+      // Engx_ScanDrill;
+    end;
+  
+    // ShowMessage(MfgPartType);
+    if MfgPartType = 'Inn' then
+    begin
+      if Engx_CoreThickness < 0.028 then
+      begin
+        //ShowMessage('doing stretch');
+        GetStretchFactors;
+        UpdateScaleFactor;
+      end;
+      Eng_JobName;
+      if fnc.SysGetAttrValue('FoundDrillFile') = true then
+        DSOuterSubFlow
+      else
+        InnerLayerFlow; //simple cores
+    end
+    else
+    begin
+      Eng_JobName;
+      if MfgPartType <> 'Too' then
+      begin
+      if Fnc.SysRouteGenAssy_isTopAssy then
+      begin
+        //ShowMessage(Fnc.SysGetAttrValueAssyMfgPart('', 'LayupThickness'));
+        //Fnc.OpenDataGrid(Fnc.SysGetSpecificBomAssembly('', 99));
+        if Fnc.SysGetAttrValueAssyMfgPart('', 'LayupThickness') = 1.1 then
+          Fnc.SysSetAttrValueAssyMfgPart('', 'LayupThickness', 0.0);
+  
+        SysRouteInsertStep('MAT.PREP');
+        SysRouteInsertStep('ML_WAIT');
+        SysRouteInsertStep('ML_LAYUP');
+        SysRouteInsertStep('LAMINATION');
+        SysRouteInsertStep('DRILL');
+      end
+      else if Fnc.SysRouteGenAssy_isSubAssy then
+      begin
+        ShowMessage('Assembly Part: ' + Fnc.SysRouteGenAssy_MfgPartName);
+        SysRouteInsertStep('MAT.PREP');
+        SysRouteInsertStep('ETCH');
+        SysRouteInsertStep('PEP');
+        SysRouteInsertStep('INNER_SUR.PREP');
+      end
+      else
+        DSOuterSubFlow
+      end;
+      else
+        ToolFlow //PTHFlow;        //DS, MLOuter, SA
+    end;
+  end;
+
+end;

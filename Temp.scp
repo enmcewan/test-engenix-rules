@@ -1,0 +1,33 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=New
+//HeaderImportExport<--
+uses
+  Event_RouteGenLibrary;
+var
+  ParamList: TStringList;
+  QTime : integer;
+  STime : integer;
+begin
+  ParamList := TStringList.Create;
+  ParamList.Add('KeyField=RecId');
+
+  //Fnc.OpenDataGrid(Fnc.SysItemTypeAttrLinkTable, ParamList);
+
+  ParamList.Free;
+  //Fnc.OpenDataGrid(Fnc.CustomTableGet('HDI_PlatingSpecDefinition'));
+ // Fnc.OpenDataGrid(Fnc.SysMaterialslaserPropertiesTable);
+// Fnc.OpenDataGrid(Fnc.GetPolarImpedanceTable);
+//Fnc.OpenDataGrid( Fnc.SysLayerTable);                                                                      
+
+
+ if Fnc.JobisRigidFlex then showmessage('R/Flex');
+
+ Fnc.OpenDataGrid(Fnc.SysGetSpecificBomCopy(false, false));
+ //Fnc.OpenDataGrid();
+                                        
+
+ SysRouteInsCrpParameter('Engx', QTime,STime, 0, '');
+end;

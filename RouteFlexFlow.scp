@@ -1,0 +1,183 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+// Created by Karen Stillie 03/09/05
+// Rev 01
+// Based on Visio Flex Flow diagram
+// The script will contain the flow only. Step Details & Instructions
+// ... will be in additional scripts.
+uses
+  Event_RouteGenLibrary, //Route System Scripts
+  RouteFunctions,
+  RouteCommonStepDetails,
+  RouteMasterFlow;
+
+procedure RigidFlexFlow;
+begin
+  SysRouteInsertStep('CAM');
+  SysRouteInsertStep('MAT.PREP');
+
+  GetFinish; //   From Route Functionss
+
+  //Single Treat?
+  //From INV_PART, GET 19th & 20th character, if either = 'S'
+  //then ST = True
+  begin
+    if (fnc.SysGetAttrValue('ST') = true) or
+      (fnc.SysGetAttrValue('RT') = true) then
+      SysRouteInsertStep('INNER_SUR.PREP');
+  end;
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+
+  //Double Treat?
+  begin
+    if (fnc.SysGetAttrValue('ST') = false) and
+      (fnc.SysGetAttrValue('RT') = false) then
+      SysRouteInsertStep('INNER_SUR.PREP');
+  end;
+
+  SysRouteInsertStep('ETCH');
+  if (Fnc.SysGetAttrValue('InnImpLine') <> '') and
+    (Fnc.SysGetAttrValue('InnImpLine') <> null) then
+  begin
+    SysRouteInsAttribute('ERP', 'IMP.LINE', Fnc.SysGetAttrValue('InnImpLine'), '');
+    SysRouteInsAttribute('ERP', 'IMP.LINE TOL.', Fnc.SysGetAttrValue('ImpLineTol'), '');
+  end;
+
+  SysRouteInsertStep('RES.STRIP');
+  SysRouteInsertStep('LASERROUT');
+  SysRouteInsertStep('AOI');
+  SysRouteInsertStep('INNER_SUR.PREP');
+  SysRouteInsertStep('ML_LAYUP');
+  SysRouteInsertStep('LAMINATION');
+  SysRouteInsertStep('LASERROUT');
+end;
+
+procedure DSFlexFlow;
+begin
+  SysRouteInsertStep('CAM');
+  SysRouteInsertStep('MAT.PREP');
+
+  GetFinish; //   From Route Functionss
+
+  //Single Treat?
+  //From INV_PART, GET 19th & 20th character, if either = 'S'
+  //then ST = True
+  if (fnc.SysGetAttrValue('ST') = true) or
+    (fnc.SysGetAttrValue('RT') = true) then
+  begin
+    SysRouteInsertStep('INNER_SUR.PREP');
+  end;
+
+  SysRouteInsertStep('LASERDRILL');
+  SysRouteInsertStep('HOLE_PREPB');
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  SysRouteInsertStep('LAM');
+  SysRouteInsertStep('EXP');
+  SysRouteInsertStep('DEV');
+  SysRouteInsertStep('CuPLATE');
+
+  if fnc.SysGetAttrValue('PltDotShot') = true then
+  begin
+    SysRouteInsertStep('RES.STRIP');
+    SysRouteInsertStep('OUTER_SUR. PREP');
+    SysRouteInsertStep('LAM');
+    SysRouteInsertStep('EXP');
+    SysRouteInsertStep('DEV');
+
+    if Finish = ('ElectroNickelGold') then
+      SysRouteInsertStep('HOLE_PREPB');
+    if fnc.SysGetAttrValue('ThinThick') = true then
+    begin
+      SysRouteInsertStep('Ni/AuFlash');
+      SysRouteInsertStep('LAM');
+      SysRouteInsertStep('EXP');
+      SysRouteInsertStep('DEV');
+      SysRouteInsertStep('AuOnly');
+      SysRouteInsertStep('RES.STRIP');
+      SysRouteInsertStep('ETCH');
+    end
+    else
+    begin
+      SysRouteInsertStep('Ni/Au');
+      SysRouteInsertStep('RES.STRIP');
+      SysRouteInsertStep('ETCH');
+    end;
+  end;
+
+  if fnc.SysGetAttrValue('PltDotShot') <> true then
+  begin
+    if Finish = ('ElectroNickelGold') then
+      if fnc.SysGetAttrValue('ThinThick') = true then
+      begin
+        SysRouteInsertStep('Ni/AuFlash');
+        SysRouteInsertStep('LAM');
+        SysRouteInsertStep('EXP');
+        SysRouteInsertStep('DEV');
+        SysRouteInsertStep('AuOnly');
+        SysRouteInsertStep('RES.STRIP');
+        SysRouteInsertStep('ETCH');
+      end
+      else
+      begin
+        SysRouteInsertStep('Ni/Au');
+        SysRouteInsertStep('RES.STRIP');
+        SysRouteInsertStep('ETCH');
+      end;
+  end;
+  if Finish <> ('ElectroNickelGold') then
+  begin
+    SysRouteInsertStep('ELECT. TIN');
+  end;
+  // Search For Solder Masks
+  FindSM; //From Route Functions
+  if SM <> 0 then
+  begin
+  end
+  else
+  begin
+    SysRouteInsertStep('LASERROUT');
+  end;
+  SysRouteInsertStep('AOI');
+  SysRouteInsertStep('OUTER_SUR. PREP');
+  if SM = 0 then
+  begin
+    SysRouteInsertStep('ML_LAYUP');
+    SysRouteInsertStep('LAMINATION');
+  end
+  else
+  begin
+    SysRouteInsertStep('FINISH_SUR.PREP');
+    SysRouteInsertStep('S/M');
+    SMONLY := true; //switch for Expose Step
+    SysRouteInsertStep('EXP');
+    SysRouteInsertStep('DEV');
+    SysRouteInsertStep('S/M CURE');
+  end;
+  if (fnc.SysGetAttrValue('ProdCode') = 'RFLEX') then
+  begin
+  end
+  else
+  begin
+    SysRouteInsertStep('LASERROUT');
+    SysRouteInsertStep('FINAL');
+    SysRouteInsertStep('SHIP');
+  end;
+end;
+
+procedure FlexFlow;
+begin
+  GetPartType;
+  //  Showmessage(MfgPartType);
+  if (MfgPartType <> 'Inn') then
+  begin
+    DSFlexFlow;
+  end
+  else
+    RigidFlexFlow;
+end;

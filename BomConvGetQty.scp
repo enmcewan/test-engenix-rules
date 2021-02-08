@@ -1,0 +1,59 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=BOM Conversion
+//HeaderImportExport<--
+{--------------------------------------------------------------
+Convert the "Occurence" in the Stackup to the Unit Of Inventory
+Measure for the ERP Inventory material This should be adapted to
+the requirements of the customer
+---------------------------------------------------------------}
+
+procedure BomConvGetQuantity(ParamList: TStringList);
+var
+  PrimeQty: double;
+  AltQty: double;
+  StepNum: integer;
+begin                 
+
+//  Fnc.OpenDataGrid(Fnc.SysErpBomTable, nil, nil, True);
+//  Fnc.OpenDataGrid(Fnc.SysStackupTable, nil, nil, True);
+
+  // Init the variables     
+  PrimeQty := 0;
+  AltQty := 0;
+  StepNum := 0;
+
+  // Primary Erp Part: Depending on Inventory Unit convert quantity
+  case UpperCase(Fnc.SysErpBomTable.FieldByName('ErpMatrlUom').AsString) of
+
+    // Square Feet
+    'SQFT':
+      begin
+      end;
+
+    // Pre-cutted sheets (panel size), check if we cut the sheets
+    'ZUSCH', 'ZU':
+      begin
+        try
+          PrimeQty := 1 / Fnc.SysFindAttrValue('ZU', False);
+        except
+        end;
+      end;
+
+  else
+    PrimeQty := 1;
+  end;
+
+  // if Alternate Parts are implemented, do a similar conversion of
+  // the quantity for these parts. Unit of Measure is in the field
+  // 'ErpMatrlUomAlt'
+
+//  case UpperCase(Fnc.SysErpBomTable.FieldByName('ErpMatrlUomAlt').AsString) of
+//  end;
+
+  ParamList.Add('Qty=' + FloatToStr(PrimeQty));
+  ParamList.Add('AltQty=' + FloatToStr(AltQty));
+  ParamList.Add('StepNum=' + IntToStr(StepNum));
+end;

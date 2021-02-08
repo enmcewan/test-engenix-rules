@@ -1,0 +1,144 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Drill and Rout
+//HeaderImportExport<--
+{------------------------------------------------------------------------------
+
+Script to convert pre-V3.1 Jobs and assign drill/rout types for new jobs
+in the create/edit layers dialog
+
+Fields that needs to be updated (tblLayers):
+
+Update this field with the 'DrillDefId' value from the tblDrillDef table
+       - tblLayers.FieldByName('DrillDefId').AsInteger
+
+Is the drill/rout file in line (stacked) with others set the value to True, else False (Default)
+       - tblLayers.FieldByName('DrillDefStacked').AsBoolean
+
+Is the drill/rout file is staggered with others set the value to True, else False (Default)
+       - tblLayers.FieldByName('DrillDefStaggered').AsBoolean
+
+If this is a stacked or staggered drill/rout file, then use lowercase characters to group the files
+        - tblLayers.FieldByName('DrillDefStackedIndx').AsString
+
+In case of Microcia's, value must be set to True, else False (Default)
+        - tblLayers.FieldByName('DrillMicroVia').AsBoolean
+
+Is the hole plated set the value to True, else False (Default)
+        - tblLayers.FieldByName('DrillPlated').AsBoolean
+
+Is the hole capped set the value to True, else False (Default)
+       - tblLayers.FieldByName('DrillCapped').AsBoolean
+
+If the hole has a filling/plugging, update this field with the 'DrillParamId' value from the tblDrillFilling table
+       - tblLayers.FieldByName('DrillFilledId').AsInteger
+
+ ------------------------------------------------------------------------------
+
+Existing fields related to drill/rout layers, still valid in V3.1
+
+- tblLayers.FieldByName('HolesPlugged').AsBoolean
+- tblLayers.FieldByName('FilledViaCond').AsBoolean
+- tblLayers.FieldByName('FilledViaNotCond').AsBoolean
+
+--------------------------------------------------------------------------------
+
+Definitions tblDrillDef.FieldByName('DrillType').AsInteger:
+
+0: Drill defintiion
+1: Laser drilling definition
+2: Rout definition
+3: CounterSink definition
+4: CounterBore definition
+
+--------------------------------------------------------------------------------}
+
+procedure DrillAndRout_Conversion(tblLayers: TSysTable; tblDrillBits: TSysTable; tblDrillDef: TSysTable; tblDrillFilling: TSysTable);
+var
+  drillLayerName : string;
+begin
+  drillLayerName := '';
+
+  while not tblLayers.Eof do
+  begin
+    tblLayers.Edit;
+
+    drillLayerName := LowerCase(tblLayers.FieldByName('LayerName').AsString);
+
+    if (( pos('vg-', drillLayerName) > 0 ) or ( pos('vd-', drillLayerName) > 0 )) then
+    begin
+      drillLayerName := copy(drillLayerName, 4, length(drillLayerName));
+    end;
+
+    if drillLayerName = 'drill' then  // PTH
+    begin
+      tblLayers.FieldByName('DrillDefId').AsInteger := 1;
+      tblLayers.FieldByName('DrillPlated').AsBoolean := true;
+    end;
+
+    if pos('lvia', drillLayerName) > 0 then   // Laser Via
+    begin
+      tblLayers.FieldByName('DrillDefId').AsInteger := 2;
+      tblLayers.FieldByName('DrillPlated').AsBoolean := true;
+      tblLayers.FieldByName('DrillMicroVia').AsBoolean := true;
+      tblLayers.FieldByName('DrillFilledId').AsInteger := 25;
+      tblLayers.FieldByName('ForceBlindVia').AsBoolean := true;
+      tblLayers.FieldByName('DrillCapped').AsBoolean := true;
+    end;
+
+    if copy(drillLayerName, 1, 3) = 'via' then //Mech  Via
+    begin
+      tblLayers.FieldByName('DrillDefId').AsInteger := 1;
+      tblLayers.FieldByName('DrillPlated').AsBoolean := true;
+      tblLayers.FieldByName('DrillCapped').AsBoolean := true;
+      tblLayers.FieldByName('DrillFilledId').AsInteger := 20;
+    end;
+
+    if drillLayerName = '2nd' then  // NPT
+    begin
+      tblLayers.FieldByName('DrillDefId').AsInteger := 5;
+      tblLayers.FieldByName('DrillPlated').AsBoolean := false;
+    end;
+
+    if drillLayerName = 'rout' then  // Rout
+    begin
+      tblLayers.FieldByName('DrillDefId').AsInteger := 3;
+      tblLayers.FieldByName('DrillPlated').AsBoolean := false;
+    end;
+
+    {
+    if LowerCase(tblLayers.FieldByName('LayerName').AsString) = 'plated' then
+      begin
+        tblLayers.FieldByName('DrillDefId').AsInteger :=1;
+        tblLayers.FieldByName('DrillPlated').AsBoolean := true;
+      end;
+
+    if LowerCase(tblLayers.FieldByName('LayerName').AsString) = 'nonplated' then
+      begin
+        tblLayers.FieldByName('DrillDefId').AsInteger :=1;
+        tblLayers.FieldByName('DrillPlated').AsBoolean := false;
+      end;
+
+    if LowerCase(tblLayers.FieldByName('LayerName').AsString) = 'rout' then
+      begin
+        tblLayers.FieldByName('DrillDefId').AsInteger :=3;
+        tblLayers.FieldByName('DrillPlated').AsBoolean := false;
+      end;
+
+    if LowerCase(tblLayers.FieldByName('LayerName').AsString) = 'rout' then
+      begin
+        tblLayers.FieldByName('DrillDefId').AsInteger :=3;
+        tblLayers.FieldByName('DrillPlated').AsBoolean := false;
+      end;
+     }
+    tblLayers.Post;
+    tblLayers.Next;
+  end;
+
+//  Fnc.OpenDataGrid(tblLayers);
+//  Fnc.OpenDataGrid(tblDrillBits);
+//  Fnc.OpenDataGrid(tblDrillDef);
+// Fnc.OpenDataGrid(tblDrillFilling);
+end;

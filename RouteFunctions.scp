@@ -1,0 +1,595 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=New
+//HeaderImportExport<--
+uses
+  Event_RouteGenLibrary, //Route System Scripts
+  Eng_DrillFunctions; //
+var
+  MfgItemValue, MfgPartType, Finish, CoreMatType: string; //Global Variables
+  TopSw, HA, FlipDrill, AuThick: Boolean; // Determines current position in BOM i.e. Top side or Bottom side.
+  LayerCount, SM, Legend  : Integer;
+  SHS, LayupThk, AspectRatio: float;
+  //Standard Variables
+  Engx_CuTop: String;        //From GenericBOM
+  Engx_CuBot: String;
+  Engx_SMSide: String;          
+  Engx_LegendSide : String;
+  Engx_LegendCount: Integer;
+  Engx_SMCount    : Integer;
+  Engx_CoreThickness: float;
+  Engx_CoreMatType : String;
+  Engx_CuWtTop : string;    // Construction
+  Engx_CuWtBot : string;
+  Engx_TotLayerCount: Integer;
+  TopLayerType: string;
+  BotLayerType: string;
+
+  Engx_ViaMax,
+  Engx_ViaMin,                      
+  Engx_PthMax,
+  Engx_PthMin,
+  Engx_NptMax,
+  Engx_NptMin,
+  Engx_DrlMax,
+  Engx_DrlMin  : float;
+  
+  
+function SequentialorBuildup : string;
+var
+  myFilter: string;
+  myTable: TSysTable;
+begin
+  result := '';
+// ItemType is inserted as first parameter by Engenix in this function
+  myTable := Fnc.SysGetAllItemAttrValueListAsTable('ItemLevel;ItemDesc;ItemLayerName');                     
+                                
+  // filter so we see only items we need
+
+  myFilter := '';
+  //miFilter := myFilter +
+  myFilter := myFilter + Format('  (ItemType=%s)', [QuotedStr(cStackupMfgSubLevel)]);  
+  myFilter := myFilter + Format(' or (ItemType=%s)', [QuotedStr(cStackupMfgSubAssy)]);
+  myFilter := myFilter + Format(' or (ItemType=%s)', [QuotedStr(cStackupLayer)]);
+
+  myFilter := myFilter + Format(' or ((ItemType=%s) and (ItemDesc=%s))', [QuotedStr(cStackupGenMatrl), QuotedStr('core')]);
+                               
+  myTable.FilterOptions := myTable.FilterOptions + SetOf([foCaseInsensitive]); 
+  myTable.Filter := myFilter;                  
+  myTable.Filtered := True;
+
+  //Fnc.OpenDataGrid(myTable);
+  
+  Fnc.SysTableDestroy(myTable); 
+end;                  
+
+procedure GetAuThick;
+begin
+  AuThick:= false;
+  if fnc.SysGetAttrValue('ENAAuThickThk') > 0.0 then
+  AuThick:= True;
+   // Fnc.SysSetAttrValue('ENAThick', true);
+end;
+
+procedure GetFlipDrill;
+begin
+  FlipDrill:= false;
+  SHS:=0.0;
+  SHS:= GetMinDrillTool('ALL');
+//  ShowMessage('SHS is...');
+//  ShowMessage(SHS);
+  if ((SHS < 8.4) and (Fnc.SysGetAttrValue('LayupThickness')> 62)) or
+     ((SHS < 11) and (Fnc.SysGetAttrValue('LayupThickness')> 93)) or
+     ((SHS < 12) and (Fnc.SysGetAttrValue('LayupThickness')> 150)) or
+     ((SHS < 14.6) and (Fnc.SysGetAttrValue('LayupThickness')> 200)) then
+  FlipDrill:= true;
+
+  //ShowMessage(FlipDrill)
+end;
+
+procedure GetLayerCount; // V2.0, modified, completed (called Engx_Total_LAyerCount
+var
+  Dummy1: string;
+  Dummy2: string;
+begin
+  // Total layers included in the CurrentMfgPart + SubLevels
+  LayerCount := 0; // start with no copper layers
+  Fnc.SysStackupSetActiveView(99);
+
+  Fnc.SysStackupItemTypeCount(cStackupLayer, False, LayerCount, Dummy1, Dummy2);
+
+  Fnc.SysStackupSetActiveView(0);
+  Fnc.SysSetAttrValue('NumLayers', LayerCount);
+
+  //Showmessage ('LayerCount ' + IntToStr(LayerCount))
+end;
+
+procedure GetCoreType;
+var
+  MaterialList: TStringList;
+begin
+  CoreMatType := '';
+
+  MaterialList := Fnc.SysStackupGetMaterialList(10, False, 'Core', 'ItemFamily');
+
+  //showmessage(MaterialList.Text); // Debug
+
+  if MaterialList.Count > 0 then
+   CoreMatType := MaterialList.Strings[MaterialList.Count - 1];
+
+  MaterialList.Free;
+end;              
+     
+procedure FindLegend; 
+begin
+
+   Fnc.SysStackupItemTypeCount(cStackupLegend, False, Engx_LegendCount, TopLayerType, TopLayerType);
+   Fnc.SysSetAttrValue('LegendSides', Engx_LegendCount);
+end;
+
+procedure FindSM;                      
+begin
+   Fnc.SysStackupItemTypeCount(cStackupSolderMask, False, Engx_SMCount, TopLayerType, TopLayerType);
+   Fnc.SysSetAttrValue('SMSides', Engx_SMCount);
+end;
+
+procedure GetFinish;
+begin
+  Finish:='';
+  Finish:= Fnc.SysGetAttrValue ('FinishType');
+end;
+
+procedure GetPartType; // V2.0, modified, completed
+var
+  TempStr: string;
+begin
+  TempStr := Fnc.SysGetAttrValue('ItemMatrlDesc');
+  MfgPartType := copy(TempStr, 1, 3);
+end;
+
+///////////////////////////////////////////////////////
+// Updates attribute Cust_Code with Customer's ERP code.
+function Eng_CustCode : string;
+var
+   Query: TAdoQuery;
+   Cust_Code : String;
+begin
+   // Create a Query Object to retrieve general data from datastore
+   Query := TADOQuery.Create(nil);
+
+   // Connect to the DataStore Database
+   Query.Connection := Fnc.DbConnection;
+
+   // Read the JobDetails into the Query
+   Query.SQL.Clear;
+
+   // Read the Customer's name into the Query
+   Query.SQL.Clear;
+   Query.SQL.Add('Select CustomerLinks.CustomerERPCode');
+   Query.SQL.Add('FROM   CustomerLinks INNER JOIN');
+   Query.SQL.Add('Jobs ON CustomerLinks.CustomerID = Jobs.CustomerID');
+   Query.SQL.Add('where JobId=' + IntToStr(Fnc.JobId));
+   Query.Open;
+
+   // See what's included in the Query
+   //Fnc.OpenDataGrid(Query, nil, nil, true);
+
+   // retrieve the required from the Query
+   result := Query.FieldByName('CustomerERPCode').AsString;
+   if (result = '') then
+      result := 'XXXXX';
+
+   // Cleaup
+   Query.Close;
+   Query.Free;
+end;
+
+
+// Call this function to get JobName (string) as return value.
+// Used by quoteImport Script.
+function Eng_JobName : string;
+var
+   Query: TAdoQuery;
+begin
+   // Create a Query Object to retrieve general data from datastore
+   Query := TADOQuery.Create(nil);
+   // Connect to the DataStore Database
+   Query.Connection := Fnc.DbConnection;
+   // Read the JobDetails into the Query
+   Query.SQL.Clear;
+   // Read the Customer's name into the Query
+   Query.SQL.Clear;
+   Query.SQL.Add('Select Jobs.JobID, Jobs.JobName, Jobs.Revision');
+   Query.SQL.Add('FROM   Jobs');
+   Query.SQL.Add('where JobId=' + IntToStr(Fnc.JobId));
+   Query.Open;
+   // See what's included in the Query
+   //Fnc.OpenDataGrid(Query, nil, nil, true);
+
+   // retrieve the required from the Query
+   result := Query.FieldByName('JobName').AsString;
+   result := result + '-' + Query.FieldByName('Revision').AsString;
+
+   if (result = '')  then
+   begin
+      result := 'XXXXX';
+     // Showmessage ('Job Name could not be found');
+   end
+   Else
+     Fnc.SysSetAttrValue('CatalogNum', result);
+   //   showmessage (result ); // display finding.
+   // Cleaup
+   Query.Close;
+   Query.Free;
+end;
+
+////////////////////////////////////////////////////////////////////////
+// Following functions are for drill file and tool related attributes //
+////////////////////////////////////////////////////////////////////////
+
+{-------------------------------------------------------
+Find the number of drillfiles linked to the MfgPart
+--------------------------------------------------------}
+function FindNumberOfDrillFiles: integer;
+var
+  Dummy1, Dummy2: string;
+begin
+  Fnc.SysStackupItemTypeCount('DRL', False, Result, Dummy1, Dummy2);
+end;
+
+{-----------------------------------------------------------
+Get the biggest tool for the specified LayerName
+------------------------------------------------------------}
+function BiggestToolOneFile(DrillFileName: string; DrillType: string): double;
+var
+  DrillRouteDetails: TSysTable;
+begin
+  // Init with a large value
+  result := 0;
+
+  // Retrieve the details for this DrillFile
+  DrillRouteDetails := Fnc.SysGetDrillRouteToolsDetails(DrillFileName);
+
+//  showmessage('function BiggestToolOneFile(' + DrillFileName + ': string, ' + DrillType + ': string)');
+//  Fnc.OpenDataGrid(DrillRouteDetails, nil, nil, True);
+
+  // Check if valid tools found
+  if DrillRouteDetails.IsEmpty then
+    result := 0.0
+  else
+  begin
+    // Just to let you see what we retrieved
+    // Loop through the table to find the smallest drillsize
+    DrillRouteDetails.First;
+    while not DrillRouteDetails.Eof do
+    begin
+      if (lowercase(DrillType) = lowercase(DrillRouteDetails.FieldByName('HoleType').AsString)) or
+         (lowercase(DrillType) = lowercase('all')) then
+      begin
+        if (DrillRouteDetails.FieldByName('Drill_Size').AsFloat > result) then
+          result := DrillRouteDetails.FieldByName('Drill_Size').AsFloat;
+      end;
+      DrillRouteDetails.next;                          
+    end;
+  end;
+
+  // Cleanup
+  DrillRouteDetails.Close;
+  Fnc.SysTableDestroy(DrillRouteDetails);
+end;
+
+{-----------------------------------------------------------
+Get the smallest tool for the specified LayerName
+------------------------------------------------------------}
+function SmallestToolOneFile(DrillFileName: string; DrillType: string): double;
+var
+  DrillRouteDetails: TSysTable;
+begin
+  // Init with a large value
+  result := 99999999;
+
+  // Retrieve the details for this DrillFile
+  DrillRouteDetails := Fnc.SysGetDrillRouteToolsDetails(DrillFileName);
+                     
+//  showmessage('function SmallestToolOneFile(' + DrillFileName + ': string, ' + DrillType + ': string)');
+//  Fnc.OpenDataGrid(DrillRouteDetails, nil, nil, True);
+
+  // Check if valid tools found
+  if DrillRouteDetails.IsEmpty then
+    result := 99999999.9
+  else
+  begin
+    // Loop through the table to find the smallest drillsize
+      DrillRouteDetails.First;         
+      while not DrillRouteDetails.Eof do 
+      begin
+
+        if (lowercase(DrillType) = lowercase(DrillRouteDetails.FieldByName('HoleType').AsString)) or
+           (lowercase(DrillType) = lowercase ('all')) then
+        begin         
+          if (DrillRouteDetails.FieldByName('Drill_Size').AsFloat < result) then
+            result := DrillRouteDetails.FieldByName('Drill_Size').AsFloat;
+        end;
+
+        DrillRouteDetails.next;
+      end;
+  end; 
+
+  // Cleanup
+  DrillRouteDetails.Close;
+  Fnc.SysTableDestroy(DrillRouteDetails);
+end;
+
+function GetMinDrillTool(DrillType: String);
+var
+   I: integer;
+   NumDrillFiles: integer;
+   CurrentLayerName: string;
+   CurrentSmallestTool: float;
+   DrillFileName: string;
+   SmallestTool: float;
+begin
+   SmallestTool := 99999999.9;
+   DrillFileName := '';
+
+   // Get the number of drillfiles
+   NumDrillFiles := FindNumberOfDrillFiles;
+   for I := 1 to NumDrillFiles do begin
+      CurrentLayerName := GetTheDrillFileName(I);
+      CurrentSmallestTool := SmallestToolOneFile(CurrentLayerName,DrillType );
+      if CurrentSmallestTool < SmallestTool then begin
+//         DrillFileName := CurrentLayerName;
+         SmallestTool := CurrentSmallestTool;
+      end;
+   end; // end of do
+
+{   // Display the results
+   if DrillFileName = '' then
+      showmessage('No DrillFiles for this MfgPart');
+}
+   result := SmallestTool;
+end;
+
+function GetMaxDrillTool(DrillType: String);
+var
+   I: integer;
+   NumDrillFiles: integer;
+   CurrentLayerName: string;
+   DrillFileName: string;
+   // For Biggest Tool
+   CurrentBiggestTool: float;
+   BiggestTool : float;
+begin
+   BiggestTool := 0.0;
+   DrillFileName := '';
+
+   // Get the number of drillfiles
+   NumDrillFiles := FindNumberOfDrillFiles;
+   for I := 1 to NumDrillFiles do begin
+      CurrentLayerName := GetTheDrillFileName(I);
+      CurrentBiggestTool := BiggestToolOneFile(CurrentLayerName, DrillType);
+      if CurrentBiggestTool > BiggestTool then begin
+//         DrillFileName := CurrentLayerName;
+         BiggestTool := CurrentBiggestTool;
+      end;
+   end; // end of do
+
+{   // Display the results
+   if DrillFileName = '' then
+      showmessage('No DrillFiles for this MfgPart');
+}
+   result := BiggestTool;
+end;
+
+
+procedure Engx_ScanDrill;
+begin
+  Engx_ViaMax := GetMaxDrillTool('via');
+  Engx_ViaMin := GetMinDrillTool('via');
+  Engx_PthMax := GetMaxDrillTool('plated');
+  Engx_PthMin := GetMinDrillTool('plated');
+  Engx_NptMax := GetMaxDrillTool('non_plated');
+  Engx_NptMin := GetMinDrillTool('non_plated');
+  Engx_DrlMax := GetMaxDrillTool('all');
+  Engx_DrlMin := GetMinDrillTool('all');
+
+end;
+
+procedure  Engx_ScanBom;  // V2.0, modified, completed
+var
+  ItemTop: string;
+  ItemBottom: string;
+begin  // main
+  Engx_SMCount:= 0;
+  Engx_SMSide := '';
+  Engx_LegendCount := 0;
+  Engx_LegendSide  := '';
+
+  Engx_CuTop  := 0.0;
+  Engx_CuBot  := 0.0;
+  Engx_CoreThickness := 9999.99;
+  Engx_CoreMatType   := '';
+  Engx_CuWtTop := '';
+  Engx_CuWtBot := '';
+
+  //Layers
+  TopLayerType := copy((Fnc.SysGetItemAttrValue('TYPE', true, cStackupLayer, 1)), 1, 1);
+  BotLayerType := copy((Fnc.SysGetItemAttrValue('TYPE', false, cStackupLayer, 1)),1, 1);
+
+  // SolderMask
+  Fnc.SysStackupItemTypeCount(cStackupSolderMask, False, Engx_SMCount, ItemTop, ItemBottom);
+  Engx_SMSide := ItemTop + ItemBottom;
+
+  // SilkScreen
+  Fnc.SysStackupItemTypeCount(cStackupLegend, False, Engx_LegendCount, ItemTop, ItemBottom);
+  Engx_LegendSide := ItemTop + ItemBottom;
+              
+  Fnc.SysStackupGetCoreData('Core', False, Engx_CoreMatType, Engx_CoreThickness, Engx_CuWtTop, Engx_CuTop, Engx_CuWtBot, Engx_CuBot);
+//  ShowMessage(Engx_CuWtTop);
+//  ShowMessage(Engx_CuTop);
+  Fnc.SysSetAttrValue('CuTop', Engx_CuWtTop);
+  Fnc.SysSetAttrValue('CuBot', Engx_CuWtBot);
+  Fnc.SysSetAttrValue('CoreThickness', Engx_CoreThickness);
+
+
+  Engx_ScanDrill;
+end;
+
+// Get total layer count.
+procedure Engx_TotalLayerCount; // V2.0, modified, completed
+var
+  Dummy1: string;
+  Dummy2: string;
+begin
+  // Total layers included in the CurrentMfgPart + SubLevels
+  Fnc.SysStackupSetActiveView(99);
+
+  Fnc.SysStackupItemTypeCount(cStackupLayer, False, Engx_TotLayerCount, Dummy1, Dummy2);
+
+  Fnc.SysStackupSetActiveView(0);
+end;
+
+
+function SysGetAdjPrepregList(InclTop: Boolean; InclBot: Boolean; ColName: string): TStringList; // V2.0, modified, completed
+var
+  TempList: TStringList;
+  Indx: integer;
+begin
+  Result := TStringList.Create;
+
+  TempList := Fnc.SysStackupGetMaterialList(-1, True, 'PP/Filler;Prepreg;MfgPart', ColName);
+
+  if InclTop then
+  begin
+    Indx := TempList.IndexOf('@@MfgPart') - 1;
+    while Indx > -1 do
+    begin
+      if TempList.Strings[Indx] = '@MfgPart' then
+        break;
+      Result.Insert(0, TempList.Strings[Indx]);
+      Dec(Indx);
+    end;
+  end;
+
+  if InclBot then
+  begin
+    Indx := TempList.IndexOf('@@MfgPart') + 1;
+    while Indx < TempList.Count do
+    begin
+      if TempList.Strings[Indx] = '@MfgPart' then
+        break;
+      Result.Add(TempList.Strings[Indx]);
+      Inc(Indx);
+    end;
+  end;
+
+  TempList.Free;
+end;
+
+
+procedure GetStretchFactors;
+var
+  PregList: TStringList;
+  StretchTable: TSysTable;
+  StretchX, StretchY: float;
+  I: Integer;
+  Has106_1080, Has2oz, FactorFound: Boolean;
+  RuleCoreMatType: string; //need this for FR4 and HTFR4 having the same stretch factor
+Begin
+  FactorFound:= false;
+  Has106_1080:= false;
+  PregList := SysGetAdjPrepregList(True, True, 'GlassStyle');
+  //Showmessage(PregList.text);
+  for I := 0 to PregList.Count - 1 do
+  Begin
+    Case PregList.Strings[I] of
+      '1080': Has106_1080:= true;
+      '106': Has106_1080:= true;
+    end;
+  end;
+  //ShowMessage(Has106_1080);
+  PregList.Free;
+
+  {ShowMessage(Engx_CoreThickness);
+  ShowMessage(TopLayerType);
+  ShowMessage(BotLayerType);
+  ShowMessage(fnc.SysFindAttrValue('PanelLength', true));
+  ShowMessage(fnc.SysFindAttrValue('PanelWidth', true));
+  ShowMessage(Engx_CuTop);
+  ShowMessage(Engx_CuBot); }
+
+  Has2oz:= false;
+  if Engx_CuTop >= 2 then
+    Has2oz:= true;
+  if Engx_CuBot >= 2 then
+    Has2oz:= true;
+  //ShowMessage(Has2oz);
+
+  RuleCoreMatType:= Engx_CoreMatType;
+  if RuleCoreMatType = 'FR4' then
+     RuleCoreMatType:= 'HTFR4';
+  //ShowMessage(RuleCoreMatType);
+
+  StretchTable := Fnc.CustomTableGet('RDStretchFactors');
+  //fnc.OpenDataGrid(StretchTable, nil, nil, true);
+
+    StretchTable.first;
+    while not StretchTable.Eof do
+    begin
+      if ((StretchTable.FieldByName('CoreThickness').AsFloat = Engx_CoreThickness) and
+         (StretchTable.FieldByName('Material').AsString = RuleCoreMatType) and
+         (StretchTable.FieldByName('PanelSizeX').AsInteger = fnc.SysFindAttrValue('PanelWidth', true)) and
+         (StretchTable.FieldByName('PanelSizeY').AsString = fnc.SysFindAttrValue('PanelLength', true)) and
+         (StretchTable.FieldByName('LayerTypeTop').AsString = TopLayerType) and
+         (StretchTable.FieldByName('LayerTypeBot').AsString = BotLayerType)) then
+      begin
+        FactorFound:=True;
+        StretchX:= StretchTable.FieldByName('StretchX').AsFloat;
+        if Has106_1080 = true then
+          StretchX:= StretchX + StretchTable.FieldByName('Addif1080/106Used').AsFloat;
+        if Has2oz = true then
+          StretchX:= StretchX + StretchTable.FieldByName('Addif2OzOrMore').AsFloat;
+        //ShowMessage(StretchX);
+        fnc.SysSetAttrValue('X_SCALE', StretchX);
+                                            
+        StretchY:= StretchTable.FieldByName('StretchY').AsFloat;
+        if Has106_1080 = true then
+          StretchY:= StretchY + StretchTable.FieldByName('Addif1080/106Used').AsFloat;
+        if Has2oz = true then
+          StretchY:= StretchY + StretchTable.FieldByName('Addif2OzOrMore').AsFloat;
+        //ShowMessage(StretchY);
+        fnc.SysSetAttrValue('Y_SCALE', StretchY);
+
+      Break;
+      end;
+      StretchTable.Next;
+    end;
+
+//If FactorFound = False then
+//  ShowMessage('Warning!!! - No Scale Factor Found. Set this Layer Attribute manually');
+end;
+
+procedure  UpdateScaleFactor;
+var
+  XScaleFactor, YScaleFactor, TempCoreThick: Float;
+
+begin  // main
+
+  XScaleFactor:= Fnc.SysGetAttrValue('X_Scale');
+  YScaleFactor:= Fnc.SysGetAttrValue('Y_Scale');
+  TempCoreThick:= Fnc.SysGetAttrValue('CoreThickness');
+
+
+   // update the top-layer
+   Fnc.SysSetItemAttrValue('X_SCALE', XScaleFactor, True,cStackupLayer, 1);
+   Fnc.SysSetItemAttrValue('Y_SCALE', YScaleFactor, True,cStackupLayer, 1);
+   Fnc.SysSetItemAttrValue('CoreThick', TempCoreThick, True,cStackupLayer, 1);
+
+   // Update the bottom Layer
+   Fnc.SysSetItemAttrValue('X_SCALE', XScaleFactor, False,cStackupLayer, 1);
+   Fnc.SysSetItemAttrValue('Y_SCALE', YScaleFactor, False,cStackupLayer, 1);
+   Fnc.SysSetItemAttrValue('CoreThick', TempCoreThick, False,cStackupLayer, 1);
+
+end;

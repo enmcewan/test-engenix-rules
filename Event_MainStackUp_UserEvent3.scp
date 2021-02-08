@@ -1,0 +1,11 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details User Event Scripts
+//HeaderImportExport<--
+procedure StackupUserEvent3(ParamList: TStringList);
+begin
+  //Fnc.SysShowFileAttachments;
+  //Fnc.SysAddFileAttachments('C:\Documents and Settings\iain.wilson\My Documents\322.pdf','Desc')
+end;

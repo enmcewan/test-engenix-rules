@@ -1,0 +1,228 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=ERP
+//HeaderImportExport<--
+{
+--> Input Parameters:
+
+ParamList.Values['JobId']
+ParamList.Values['JobRev']
+ParamList.Values['JobName']
+ParamList.Values['CustCode']
+ParamList.Values['CustName']
+ParamList.Values['CustPartNum']
+ParamList.Values['CustPartRev']
+ParamList.Values['CustPartDesc']
+ParamList.Values['BomLevel']
+ParamList.Values['BomLevelSeq']
+ParamList.Values['PartType'] (TOOL or MFGPART)
+ParamList.Values['TopLayer']
+ParamList.Values['BottomLayer']
+ParamList.Values['CombinedMfgPart']
+ParamList.Values['CombinedLayers']
+ParamList.Values['MfgPartUniqueSeq']
+
+--> Output Parameters:
+                              
+ParamList.Values['ErpMfgPartNum']
+ParamList.Values['ErpMfgPartDesc']
+}
+                                    
+procedure GetErpMfgPartNum(ParamList);
+
+var                                          
+  MfgPartNum: string;
+Begin
+
+{
+===> Upgrade Comment ===============================================================
+
+This script is executed at the time of exporting to the Erp system, you can copy&paste
+the code from your current "UserCreateParadigmMfgPartNumDesc" procedure. After the upgrade
+it is strongly recommended that you remove the "UserCreateParadigmMfgPartNumDesc" from
+your script.
+
+There are however 2 changes:
+
+Parameters from the Engenix code are all passed in the "ParamList", parameters passed
+back from this script to the Engenix code should also be done using this "ParamList".
+
+At the end of the script update the 'ErpMfgPartNum' parameter with the partnumber you
+want to have in the Erp system. Updating is done like:
+
+    ParamList.Values['ErpMfgPartNum'] := 'MfgPart Number in Erp';
+
+By default the MfgPart will get the same description as what you see in Engenix, if
+you want to have a different description in the Erp system, then create the value in
+this script, at the end do an update like:
+
+    ParamList.Values['ErpMfgPartDesc'] := 'MfgPart Description in Erp';
+
+===> Upgrade Comment ===============================================================
+}
+{  if ParamList.Values['PartType'] = 'TOOLING' then
+    MfgPartNum := 'T-'
+  else
+    MfgPartNum := 'Z-';
+
+  begin
+    if ParamList.Values['CombinedMfgPart'] = 'TRUE' then
+    begin
+    MfgPartNum := MfgPartNum +
+                  copy(ParamList.Values['JobName'], 1, 5) + '-' +
+                  copy(ParamList.Values['JobRev'], 1, 2) + '-' +
+                  copy(ParamList.Values['TopLayer'], 1, 3) + '-' +
+                  copy(ParamList.Values['BottomLayer'],1, 3);
+                  //ShowMessage(MfgPartNum);
+    end
+    else
+    begin
+    MfgPartNum := MfgPartNum +
+                  copy(ParamList.Values['JobName'], 1, 5) + '-' +
+                  copy(ParamList.Values['JobRev'], 1, 2) + '-' +
+                  copy(ParamList.Values['TopLayer'], 1, 3) + '/' +
+                  copy(ParamList.Values['BottomLayer'],1, 3);
+                  ShowMessage(MfgPartNum);
+    end;
+  end;
+}
+
+  if ParamList.Values['PartType'] = 'MFGPART' then
+  begin
+    MfgPartNum := 'ZY';
+    if ParamList.Values['CombinedMfgPart'] = 'TRUE' then
+    begin
+    MfgPartNum := MfgPartNum +
+                  copy(ParamList.Values['JobName'], 1, 5) + '-' +
+                  copy(ParamList.Values['JobRev'], 1, 2) + '-' +
+                  copy(ParamList.Values['TopLayer'], 1, 3) + '-' +
+                  copy(ParamList.Values['BottomLayer'],1, 3);
+                  //ShowMessage(MfgPartNum);
+    end
+    else
+    begin
+      //For Top Level Parts
+      if ParamList.Values['MfgPartStructure'] = 'TopLevel' then
+      begin
+        MfgPartNum := MfgPartNum +
+                      'BOM-' +
+                      copy(ParamList.Values['JobName'], 1, 5);
+       // ShowMessage(MfgPartNum);
+      end
+      else
+      //subs & inners
+      begin
+       // ShowMessage(ParamList.Values['TopLayer'] + '  ' + ParamList.Values['BottomLayer']);
+       // ShowMessage(ParamList.Values['MfgPartStructure']);
+
+        MfgPartNum := MfgPartNum +
+                      copy(ParamList.Values['JobName'], 1, 5) + '-';
+
+        if ParamList.Values['MfgPartStructure'] = 'Blind'
+        then
+          MfgPartNum := MfgPartNum + 'BLIND ';
+
+        if ParamList.Values['MfgPartStructure'] = 'Buried'
+        then
+          MfgPartNum := MfgPartNum + 'BURIED ';
+
+        if ParamList.Values['MfgPartStructure'] = 'SubLam'
+        then
+          MfgPartNum := MfgPartNum + 'SUBLAM ';
+
+        if (
+           (ParamList.Values['MfgPartStructure'] = 'InnerLayer') and
+           (ParamList.Values['TopLayer'] = 'x') and
+           (ParamList.Values['BottomLayer'] = 'x')
+           )
+        then
+        Begin
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 1 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -1 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 2 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -2 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 3 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -3 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 4 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -4 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 5 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -5 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 5 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -6 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 7 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -7 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 8 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -8 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 9 ';
+
+          if ParamList.Values['ErpMfgPartDesc'] = 'InnerLayer -9 x / x' then
+            MfgPartNum :=  MfgPartNum + 'ETCHOFF 10 ';
+
+        End
+        else
+        Begin
+          if copy(ParamList.Values['TopLayer'], 1, 4) = 'LYR-' then
+          begin
+            MfgPartNum := MfgPartNum + copy(ParamList.Values['TopLayer'], 5, 2);
+          end
+          else //Assuming "L-XX' for Engenix created layer names
+          begin
+            MfgPartNum := MfgPartNum + copy(ParamList.Values['TopLayer'], 3, 2);
+          end;
+
+          MfgPartNum := MfgPartNum + '-'; //Add a dash between the layers for subs
+
+          if copy(ParamList.Values['BottomLayer'], 1, 4) = 'LYR-' then
+          begin
+            MfgPartNum := MfgPartNum + copy(ParamList.Values['BottomLayer'], 5, 2);
+          end
+          else
+          begin
+            MfgPartNum := MfgPartNum + copy(ParamList.Values['BottomLayer'], 3, 2);
+          end;
+
+        End;
+       //ShowMessage(MfgPartNum);
+      end;
+
+    end;
+  end;
+  else if ParamList.Values['PartType'] = 'TOOLING' then
+  Begin
+    MfgPartNum := 'T';
+    MfgPartNum := MfgPartNum +
+                  copy(ParamList.Values['JobName'], 1, 5) + '-' +
+                  copy(ParamList.Values['BomLevel'], 1, 2) + '-' +
+                  copy(ParamList.Values['BomLevelSeq'], 1, 2);
+
+  // ShowMessage(MfgPartNum);
+  End
+  else if ParamList.Values['PartType'] = 'ASSEMBLY' then
+  begin  // Assembly Parts
+    if ParamList.Values['ItemType'] = 'MFGTA'  then
+      MfgPartNum := copy(ParamList.Values['JobName'], 1, 5) + '-Assembly';
+    else if ParamList.Values['ItemType'] = 'MFGAS' then
+      MfgPartNum := copy(ParamList.Values['JobName'], 1, 5) + '-Insulator';
+    else
+      MfgPartNum := copy(ParamList.Values['JobName'], 1, 5) + '-Unknown';
+  end
+  else
+    MfgPartNum := copy(ParamList.Values['JobName'], 1, 5) + '-UnknownXX';
+
+
+
+  ParamList.Values['ErpMfgPartNum'] := MfgPartNum;
+//   ParamList.Values['ErpMfgPartDesc'] := '????';
+End;
+

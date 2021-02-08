@@ -1,0 +1,30 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Engenix Startup
+//HeaderImportExport<--
+procedure LoadExcelFile(FileName: string; SheetName: string; CustTableName: string; CustTable: TSysTable);
+var
+  aQry: TAdoQuery;
+begin
+  aQry := TAdoQuery.Create(nil);
+
+  aQry.ConnectionString :=
+       'Provider=Microsoft.Jet.OLEDB.4.0;' +
+       'Data Source =' + FileName + ';' +
+       'Extended Properties=Excel 8.0';
+
+  aQry.Sql.Clear;
+  aQry.Sql.Add('Select * From [' + SheetName + '$]');
+
+  aQry.Active := True;
+
+  CustTable.CreateTableAs(aQry,  SetOf([]));
+  // The field 'ID' is required for viewing the MemDataSet in the scriptbuilder
+  Fnc.SysTableAddField(CustTable, 'ID', 0, ftAutoInc, False);
+  CustTable.LoadFromDataSet(aQry,  SetOf([]));
+
+  aQry.Active := False;
+  aQry.Free;
+end;

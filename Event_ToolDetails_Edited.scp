@@ -1,0 +1,20 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Layer Maintenance
+//HeaderImportExport<--
+procedure ToolDetails_Edited(ParamList: TStringList; ToolDetails: TSysTable);
+begin
+
+  case LowerCase(ParamList.Values['FieldName']) of
+    'finish_size':
+      begin
+        ToolDetails.Edit;
+        ToolDetails.FieldByName('Drill_Size').AsFloat := ToolDetails.FieldByName('Finish_Size').AsFloat + 0.10;
+        ToolDetails.Post;
+      end;
+  end;
+
+
+end;

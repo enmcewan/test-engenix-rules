@@ -1,0 +1,157 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Layer Maintenance
+//HeaderImportExport<--
+procedure RestoreStackupStatus(RecId: integer);
+begin
+  if RecId < 0 then
+    Exit;
+
+ // Fnc.SysLayupClearFlags(True);
+
+  Fnc.SysStackupTable.Locate('RecId', RecId,  SetOf([]));
+                       
+  Fnc.SysStackupTable.Edit;
+  Fnc.SysStackupTable.FieldByName('CurrActiveMfgPart').AsBoolean := True;
+  Fnc.SysStackupTable.Post;
+
+
+
+  Fnc.SysStackupSetActiveView(0);
+
+end;
+
+function SetStackupView(ParamList: TStringList): boolean;
+var
+  aTable: TSysTable;
+  ItemType: string;
+begin
+  Result := False;
+  //  fnc.opendatagrid(Fnc.SysStackupTable,nil,nil,false);
+ // Fnc.SysLayupClearFlags(True);
+                   
+  // short-cut
+  aTable := Fnc.SysStackupTable;
+
+  case ParamList.Values['LayerType'] of
+    'DRILL': ItemType := cStackupDrill;
+    'ROUT':  ItemType := cStackupRout;
+    else     ItemType := 'UnKnown';
+  end;
+                       
+  if aTable.Locate(
+        'ItemType;ItemLayerName',
+        [ItemType, ParamList.Values['LayerName']],
+        SetOf(loCaseInsensitive)) then
+  begin
+    // go back until we find the MfgPart
+    while not aTable.Bof do
+    begin
+      if (aTable.FieldByName('ItemType').AsString = cStackupMfgTopLevel) or
+         (aTable.FieldByName('ItemType').AsString = cStackupMfgSubLevel) or
+         (aTable.FieldByName('ItemType').AsString = cStackupMfgSubAssy) then
+      begin
+        aTable.Edit;
+        aTable.FieldByName('CurrActiveMfgPart').AsBoolean := True;
+        aTable.Post;
+
+        Fnc.SysStackupSetActiveView(99);
+
+        Result := True;
+
+        break;
+      end;
+
+      aTable.Prior;
+    end;
+  end;
+
+end;
+
+function CheckForSpecialPrepreg: boolean;
+var
+  aTable: TSysTable;
+begin
+  Result := False;
+
+  aTable := Fnc.SysStackupTable;
+
+  aTable.First;
+
+  while not (aTable.Eof or Result) do
+  begin
+    if aTable.FieldByName('ItemType').AsString = cStackupGenMatrl then
+      Result := pos('106', aTable.FieldByName('ItemMatrlDesc').AsString) > 0;
+    aTable.Next;
+  end;
+end;
+
+procedure ToolDetailsUserEvent1(ToolDataSet: TSysTable; ParamList: TStringList);
+var              
+  SaveRecId: integer;
+  SpecialPrepreg: boolean;
+
+   PartPerPanel: integer;
+begin
+  SpecialPrepreg := False;
+  Fnc.OpenDataGrid(ToolDataSet, nil, nil, True);
+ //
+  PartPerPanel := Fnc.SysGetAttrValue('NumStepsPanel');
+
+  if Fnc.SysStackupTable.Locate('CurrActiveMfgPart', True, SetOf([])) then
+  begin
+    SaveRecId := Fnc.SysStackupTable.FieldByName('RecId').AsInteger;
+  end
+  else
+    SaveRecId := -1;
+
+  if SetStackupView(ParamList) then
+    SpecialPrepreg := CheckForSpecialPrepreg;
+
+  ToolDataSet.First;
+  while not ToolDataSet.Eof do
+  begin
+
+    ToolDataSet.Edit;
+
+    if  (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'via') then
+      ToolDataSet.FieldByName('Drill_Size').AsFloat :=
+          ToolDataSet.FieldByName('Finish_Size').AsFloat
+          + 2;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'plated') then
+      ToolDataSet.FieldByName('Drill_Size').AsFloat :=
+          ToolDataSet.FieldByName('Finish_Size').AsFloat
+          + 4;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'non_plated') then
+      ToolDataSet.FieldByName('Drill_Size').AsFloat :=
+          ToolDataSet.FieldByName('Finish_Size').AsFloat + 2;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'plated') then
+      ToolDataSet.FieldByName('MIN_TOL').AsFloat := 4;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'plated') then
+      ToolDataSet.FieldByName('MAX_TOL').AsFloat := 4;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'non_plated') then
+      ToolDataSet.FieldByName('MIN_TOL').AsFloat := 0;
+
+     if (LowerCase(ToolDataSet.FieldByName('HoleType').AsString) = 'non_plated') then
+      ToolDataSet.FieldByName('MAX_TOL').AsFloat := 4;
+
+      ToolDataSet.FieldByName('TotNumHoles').AsInteger :=
+        ToolDataSet.FieldByName('NumHoles').AsInteger * PartPerPanel;
+
+
+    ToolDataSet.Post;
+
+    ToolDataSet.Next;
+
+
+  end;
+
+  RestoreStackupStatus(SaveRecId);
+end;

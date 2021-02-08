@@ -1,0 +1,34 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Impedance
+//HeaderImportExport<--
+{
+ Script to calculate the Measured impedance in the impedence
+ model grid given a simulated impedance.
+
+ Data is passed from the Layup Module to the script using the
+ Fnc.SysLayupParamTable and Fnc.SysImpedanceModels. They have all information
+ needed to calculate the final measured impedance.
+
+ Fnc.SysImpedanceModels will only have the single record that needs the line width
+   calculated.
+
+ The script should calculate/update the following fields in Fnc.SysImpedanceModels:
+
+ - 'PredictedImpedance' (float)
+       Predicted impedance of the model given the input values for the model and layup.
+}
+
+begin
+  with Fnc.SysImpedanceModels do
+  begin
+    Edit;
+    // by default, we just copy the same plotted line width...this algorithm needs to be
+    // changed to match the end customer's calculation for plotted line width.
+    //FieldByName('MeasuredImpedance').AsFloat := 0.0 - 0.0005 + FieldByName('SimulatedImpedance').AsFloat;
+    FieldByName('PredictedImpedance').AsFloat := FieldByName('SimulatedImpedance').AsFloat;
+    Post;
+  end;
+end;

@@ -1,0 +1,478 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+uses                                                                                                                                                                                                                                                                    
+  Event_RouteGenLibrary, //Route System Scripts
+  RouteFunctions,
+  Eng_RouteFunctions,
+  RouteMasterFlow; //, RouteFlexFlow;      //User scripts
+
+function VerifyKeyAttributesOK(ErrorList: TStringList): boolean;
+begin
+  Result := true;
+  //ShowMessage('Verifying Key Attrs');
+  if fnc.SysFindAttrValue('PanelLength', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('PanelLength');
+  end;
+  if fnc.SysFindAttrValue('PanelWidth', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('PanelWidth');
+  end;
+  if fnc.SysFindAttrValue('MinInnerAnnRingJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinInnerAnnRingJob');
+  end;
+  if fnc.SysFindAttrValue('MinInnerTraceJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinInnerTraceJob');
+  end;
+  if fnc.SysFindAttrValue('MinInnerSpaceJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinInnerSpaceJob');
+  end;
+  if fnc.SysFindAttrValue('MinInnerHoleToCopperJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinInnerHoleToCopperJob');
+  end;
+  if fnc.SysFindAttrValue('boardsizex', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('boardsizex');
+  end;
+  if fnc.SysFindAttrValue('boardsizey', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('boardsizey');
+  end;
+  if fnc.SysFindAttrValue('NumStepsPanel', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('NumStepsPanel');
+  end;
+  if fnc.SysFindAttrValue('NumPanel', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('Number of Panels');
+  end;
+  if fnc.SysFindAttrValue('NumLayers', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('NumLayers');
+  end;
+  if fnc.SysFindAttrValue('SmallDrill', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('SmallDrill');
+  end;
+  if fnc.SysFindAttrValue('MinOuterAnnRingJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinOuterAnnRingJob');
+  end;
+  if fnc.SysFindAttrValue('MinOuterHoleToCopperJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinOuterHoleToCopperJob');
+  end;
+  if fnc.SysFindAttrValue('MinOuterSpaceJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinOuterSpaceJob');
+  end;
+  if fnc.SysFindAttrValue('MinOuterTraceJob', true) = NULL then
+  begin
+    Result := false;
+    ErrorList.Add('MinOuterTraceJob');
+  end;
+
+end;
+
+procedure RtePostProcessUpdateMfgPartAttr;
+// Only Set Attributes AFTER Route Gen when the value is created DURING ROUTE GEN
+begin
+
+  fnc.SysSetAttrValue('CoreMat', fnc.SysFindAttrValue('CoreMat', true));
+
+end;
+
+procedure RtePostProcessCopyMfgPartAttrToLyrAttr;
+begin
+
+end;
+
+procedure ResetRouteStepCuValues;
+begin
+  Fnc.SysSetAttrValue('RouteStepCopperThickTop', 0.0);
+  Fnc.SysSetAttrValue('RouteStepCopperThickBottom', 0.0);
+  Fnc.SysSetAttrValue('RouteStepCopperThickTotalTop', 0.0);
+  Fnc.SysSetAttrValue('RouteStepCopperThickTotalBottom', 0.0);
+end;
+
+procedure UpdateRouteStepCu;
+var
+  CopperStepTable: TSysTable;
+  cuThkTop : float;
+  cuThkBot : float;
+begin
+  cuThkTop := 0.0;
+  cuThkBot := 0.0;
+  CopperStepTable := Fnc.SysGetCopperCalcRoute;
+
+  CopperStepTable.First;
+  while not CopperStepTable.EOF do
+  begin
+    if CopperStepTable.FieldByName('RouteStepCopperThickTop').AsFloat > 0 then
+      cuThkTop := CopperStepTable.FieldByName('RouteStepCopperThickTop').AsFloat;
+
+    if CopperStepTable.FieldByName('RouteStepCopperThickBottom').AsFloat > 0 then
+      cuThkBot := CopperStepTable.FieldByName('RouteStepCopperThickBottom').AsFloat;
+
+    CopperStepTable.Next;
+  end
+
+  Fnc.SysSetAttrValue('RouteStepCopperThickTop', cuThkTop);
+  Fnc.SysSetAttrValue('RouteStepCopperThickBottom', cuThkBot);
+
+  Fnc.SysTableDestroy(CopperStepTable);
+end;
+
+procedure RoutePostProcessDetails;
+begin
+  // Update mfg. part attributes
+  RtePostProcessUpdateMfgPartAttr;
+  // Copy mfg. party attributes to Layer Attributes
+  RtePostProcessCopyMfgPartAttrToLyrAttr;
+
+  //UpdateRouteStepCu;
+end;
+
+procedure RoutePreProcessDetails;
+var
+  ErrorList: TStringList;
+  HolesPerPanel: integer;
+begin
+  ErrorList := TStringList.Create;
+  SequentialorBuildup;
+  GetPartType;
+  GetLayerCount;
+  Engx_ScanBOM;
+  Engx_ScanDrill;
+  // ShowMessage(Fnc.SysGetAttrValue('PanelLength'));
+  fnc.SysSetAttrValue('HolesPerPanel', 3476);
+  fnc.SysSetAttrValue('PanelLength', 24);
+  fnc.SysSetAttrValue('PanelWidth', 18);
+
+  //if FoundOutsideDrillInSub then
+   // ShowMessage('FoundOutsideDrillInSub');
+   Fnc.SysSetAttrValueForMfgPart(1,'MinInnerAnnRingJob', 0.004 )
+
+  fnc.SysSetAttrValue('MinInnerAnnRingJob', 0.004);
+  fnc.SysSetAttrValue('MinInnerTraceJob', 0.006);
+  fnc.SysSetAttrValue('MinInnerSpaceJob', 0.005);
+  fnc.SysSetAttrValue('MinInnerHoleToCopperJob', 0.008);
+  fnc.SysSetAttrValue('MinOuterAnnRingJob', 0.005);
+  fnc.SysSetAttrValue('MinOuterTraceJob', 0.003);
+  fnc.SysSetAttrValue('MinOuterSpaceJob', 0.005);
+  fnc.SysSetAttrValue('MinOuterHoleToCopperJob', 0.008);
+
+  fnc.SysSetAttrValue('NumStepsPanel', 4);
+  {
+  fnc.SysSetAttrValue('boardsizex', 7.25);
+  fnc.SysSetAttrValue('boardsizey', 3.5);
+  }
+  fnc.SysSetAttrValue('SmallDrill', 0.006);
+  fnc.SysSetAttrValue('AspectRatio', 10.4556);
+  //fnc.SysSetAttrValue('NumPanel', 10);
+
+  if not VerifyKeyAttributesOK(ErrorList) then
+  begin
+    ShowMessage('Key Attribute Values have not been entered - Check the Attribute Grid' + #10#13#10#13 + ErrorList.text);
+    ShowMessage('Route Gen Aborted - No changes have been made');
+    Fnc.SysRouteGenAbort := true;
+    ErrorList.free;
+  end
+  else
+  begin
+    //Set Any Attributes here that are manually entered or set prior to Route gen. Basically these get copied to subs and inners
+    fnc.SysSetAttrValue('Allentown', fnc.SysFindAttrValue('Allentown', true));
+    HolesPerPanel := 0;
+    HolesPerPanel := (fnc.SysFindAttrValue('TotNumHoles', true)) * (fnc.SysFindAttrValue('NumStepsPanel', true));
+    fnc.SysSetAttrValue('HolesPerPanel', HolesPerPanel);
+    fnc.SysSetAttrValue('PanelLength', fnc.SysFindAttrValue('PanelLength', true));
+    fnc.SysSetAttrValue('PanelWidth', fnc.SysFindAttrValue('PanelWidth', true));
+    fnc.SysSetAttrValue('MinInnerAnnRingJob', fnc.SysFindAttrValue('MinInnerAnnRingJob', true));
+    fnc.SysSetAttrValue('MinInnerTraceJob', fnc.SysFindAttrValue('MinInnerTraceJob', true));
+    fnc.SysSetAttrValue('MinInnerSpaceJob', fnc.SysFindAttrValue('MinInnerSpaceJob', true));
+    fnc.SysSetAttrValue('MinInnerHoleToCopperJob', fnc.SysFindAttrValue('MinInnerHoleToCopperJob', true));
+    fnc.SysSetAttrValue('NumLayers', fnc.SysFindAttrValue('NumLayers', true));
+    fnc.SysSetAttrValue('NumStepsPanel', fnc.SysFindAttrValue('NumStepsPanel', true));
+    fnc.SysSetAttrValue('ProdCode', fnc.SysFindAttrValue('ProdCode', true));
+    fnc.SysSetAttrValue('ShelfLife', fnc.SysFindAttrValue('ShelfLife', true));
+    fnc.SysSetAttrValue('boardsizex', fnc.SysFindAttrValue('boardsizex', true));
+    fnc.SysSetAttrValue('boardsizey', fnc.SysFindAttrValue('boardsizey', true));
+    fnc.SysSetAttrValue('NumPanel', fnc.SysFindAttrValue('NumPanel', true));
+    fnc.SysSetAttrValue('SpecProc', fnc.SysFindAttrValue('SpecProc', true));
+    fnc.SysSetAttrValue('ThickTol', fnc.SysFindAttrValue('ThickTol', true));
+    fnc.SysSetAttrValue('OutService', fnc.SysFindAttrValue('OutService', true));
+    fnc.SysSetAttrValue('SmallDrill', fnc.SysFindAttrValue('SmallDrill', true));
+    //fnc.SysSetAttrValue('LamRange', fnc.SysFindAttrValue('LamRange', true));
+
+   // Fnc.OpenDataGrid(Fnc.GetRLGCImpedanceTable);
+  //Fnc.OpenDataGrid(Fnc.SysGetDrillDetails);
+  end;
+end;
+
+procedure CamStepDetails;
+var
+  aTable: TSysTable;
+begin
+  SysRouteInsDepartment('Erp', 'CAMDPT-D', '');
+  SysRouteInsWorkCenter('Erp', 'CAM-WC', '');
+  SysRouteInsInstruction('Erp', 'CAM001', '');
+  SysRouteInsStepInformation('Route Step Information');
+
+  aTable := Fnc.SysToolControlGet;
+
+  //Fnc.OpenDataGrid(aTable);
+
+  aTable.Append;
+  aTable.FieldByName('ToolTypeDesc').AsString := 'Standard';
+  aTable.FieldByName('MfgPart').AsString := Fnc.SysGetAttrValue('ItemMatrlDesc');
+  aTable.FieldByName('ToolName').AsString := 'GoldPhoto'; 
+  aTable.Post;
+
+
+  Fnc.SysToolControlUpdate(aTable);
+  Fnc.SysTableDestroy(aTable);
+end;
+
+procedure MatPrepDetails;
+var
+  Material: TStringlist;
+  Quantity: Integer;
+begin
+  //  ShowMessage('Material Prep');
+  SysRouteInsDepartment('Erp', 'MATPRE-D', '');
+  SysRouteInsWorkCenter('Erp', 'MATPRE-D', '');
+
+  //Create Materials List
+  Material := TStringlist.Create;
+
+  if Fnc.SysRouteGenAssy_isTopAssy then
+  begin
+    Material.Add(cStackupMfgTopLevel);   // Toplevel Pcb
+    Material.Add(cStackupMfgAssemblySub);  // Sub-Assy/Inner Assembly
+    Material.Add(cStackupSpecMatrl); // Components in the Assembly BOM
+  end
+  else
+  begin
+    Material.add('Foil');
+    Material.add('Prepreg');
+    Material.add('PP/Filler');
+    Material.add('Core');
+    Material.add('MFGSB');
+    Material.add('MFGBV');
+    Material.add('MFGTL');
+    //Material.add('MFGAP');
+    //Material.add('MFGAS');
+    //Material.add('MATSP');
+
+    Material.add('Coverlayer');
+    Material.add('AdhesiveLayer');
+    Material.add('BondPly');
+    Material.add('MFGRF');
+    Material.add('MFGRMAT');
+  end;
+
+  Quantity := 1;
+
+  SysRouteInsMaterials('Egnx', Material, Quantity, '6');
+  Material.free;
+
+  SysRouteInsCosting('Erp', 2, 'CostDirMatrl', 15.24, '');
+
+  SysRouteInsCrpParameter('Erp', 240, 600, 10.0, '');
+
+end;
+                                                                                                                   
+procedure LamStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'RESLAM-D', '');
+  SysRouteInsWorkCenter('Erp', 'RESLAM-D', '');
+  SysRouteInsAttribute('Erp', 'Unit#', '', '');
+
+  if ((MfgPartType = 'Top') or
+    (MfgPartType = 'Sub')) then
+  begin
+    GetFinish; //   From Route Functionss
+    //ShowMessage(Finish);
+    if (Finish = 'ElectroNickelGold') and
+      ((fnc.SysGetAttrValue('MinOuterSpaceJob') >= 4.0) or
+      (fnc.SysGetAttrValue('MinOuterTraceJob') >= 4.0)) then
+    begin
+      SysRouteInsInstruction('Erp', 'RES007', '');
+    end
+    else
+      SysRouteInsInstruction('Erp', 'RES008', '');
+  end;
+  if (MfgPartType = 'Inn') then
+  begin
+    if (fnc.SysGetAttrValue('MinInnerTraceJob') < 4.0) or
+      (fnc.SysGetAttrValue('MinInnerSpaceJob') < 4.0) then
+      SysRouteInsInstruction('Erp', 'RES009', '')
+    else
+      SysRouteInsInstruction('Erp', 'RES008', '');
+  end;
+
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 5.65, '');
+
+  //SysRouteLinkMfgPart('InnerLayer L-3 / L-4', -1);
+
+end;
+
+procedure ExposeStepDetails;
+var
+  SMONLY: boolean;
+  min_line, min_p2p: string;
+
+begin
+  GetPartType;
+  SysRouteInsDepartment('Erp', 'EXPOSE-D', '');
+  SysRouteInsWorkCenter('Erp', 'EXPOSE-D', '');
+
+  // min_line := Fnc.SysGetItemAttrValue('min_line', true, cStackupLayer, 1) + '/' + Fnc.SysGetItemAttrValue('min_line', false, cStackupLayer, 1);
+  // min_p2p :=  Fnc.SysGetItemAttrValue('min_p2p', true, cStackupLayer, 1) + '/' + Fnc.SysGetItemAttrValue('min_p2p', false, cStackupLayer, 1)  ;
+
+    {if (MfgPartType = 'Inn') then
+      begin
+        SysRouteInsAttribute('Erp', 'InnerTrace', min_line,'');
+        SysRouteInsAttribute('Erp', 'InnerSpace', min_p2p ,'');
+      end
+    else
+      begin
+        SysRouteInsAttribute('Erp', 'OuterTrace', min_line,'');
+        SysRouteInsAttribute('Erp', 'OuterSpace', min_p2p,'');
+      end;
+    }
+
+  if ((MfgPartType = 'Top') or
+    (MfgPartType = 'Sub')) then
+  begin
+    GetFinish; //   From Route Functionss
+    //ShowMessage(Finish);
+    if (Finish = 'ElectroNickelGold') and
+      ((fnc.SysGetAttrValue('MinOuterSpaceJob') >= 4.0) or
+      (fnc.SysGetAttrValue('MinOuterTraceJob') >= 4.0)) then
+    begin
+      SysRouteInsInstruction('Erp', 'RES010', '');
+    end
+    else
+      SysRouteInsInstruction('Erp', 'RES011', '');
+  end;
+  if (MfgPartType = 'Inn') then
+  begin
+    if (fnc.SysGetAttrValue('MinInnerTraceJob') < 4.0) or
+      (fnc.SysGetAttrValue('MinInnerSpaceJob') < 4.0) then
+      SysRouteInsInstruction('Erp', 'RES012', '')
+    else
+      SysRouteInsInstruction('Erp', 'RES011', '');
+  end;
+
+  if (MfgPartType <> 'Inn') then
+    if SMONLY = true then
+    begin
+      //FindSM;
+      if fnc.SysGetAttrValue('SMSIDES') > 0 then
+      begin
+        SysRouteInsAttribute('Erp', 'Unit#', '_____', '');
+        SysRouteInsAttribute('Erp', 'S/M AR', fnc.SysGetAttrValue('SMAR'), '');
+        SysRouteInsAttribute('Erp', 'S/M Dam', fnc.SysGetAttrValue('SMDam'), '');
+        FindLegend;
+        if Legend > 0 then
+        begin
+          SysRouteInsInstruction('Erp', 'EXP004    ', '');
+          SysRouteInsAttribute('Erp', '# Silks', fnc.SysGetAttrValue('LegendSides'), '');
+        end;
+        SysRouteInsInstruction('Erp', 'EXP011    ', '');
+      end;
+    end;
+
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 2.18, '');
+  SysRouteInsCrpParameter('Erp', 0, 100, 24.0, '');
+end;
+
+procedure DevStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'DEVELP-D', '');
+  SysRouteInsWorkCenter('Erp', 'DEVELP-D', '');
+  SysRouteInsInstruction('Erp', 'DEV001    ', '');
+  SysRouteInsInstruction('Erp', 'INS017', '');
+
+  if ((MfgPartType = 'Top') or
+    (MfgPartType = 'Sub')) then
+  begin
+    GetFinish; //   From Route Functionss
+    //ShowMessage(Finish);
+    if (Finish = 'ElectroNickelGold') and
+      ((fnc.SysGetAttrValue('MinOuterSpaceJob') >= 4.0) or
+      (fnc.SysGetAttrValue('MinOuterTraceJob') >= 4.0)) then
+    begin
+      SysRouteInsInstruction('Erp', 'RES010', '');
+    end
+    else
+      SysRouteInsInstruction('Erp', 'RES011', '');
+  end;
+  if (MfgPartType = 'Inn') then
+  begin
+    if (fnc.SysGetAttrValue('MinInnerTraceJob') < 4.0) or
+      (fnc.SysGetAttrValue('MinInnerSpaceJob') < 4.0) then
+      SysRouteInsInstruction('Erp', 'RES012', '')
+    else
+      SysRouteInsInstruction('Erp', 'RES011', '');
+  end;
+  SysRouteInsCrpParameter('Erp', 0, 100, 24.0, '');
+end;
+
+procedure InProcessStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'FINALV-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'PREROUT ', '');
+  SysRouteInsInstruction('Erp', 'INS003', '');
+end;
+
+procedure EtchStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'ETCHDP-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'ETCHDP-D  ', '');
+  SysRouteInsInstruction('Erp', 'INS017', '');
+  SysRouteInsAttribute('Erp', 'Base CuTop', Fnc.SysGetAttrValue('CuTop'), '');
+  SysRouteInsAttribute('Erp', 'Base CuBot', Fnc.SysGetAttrValue('CuBot'), '');
+
+  if (MfgPartType = 'Inn') or
+    (MfgPartType = 'Sub') then
+  begin
+    //   SysRouteInsAttribute('Erp','Min.Trace',Fnc.SysGetAttrValue('MinInnerTraceJob'),'');
+    //   SysRouteInsAttribute('Erp','Min.Trace Tol.',Fnc.SysGetAttrValue('InTraceTol'),'');
+  end
+  else
+  begin
+    //      SysRouteInsAttribute('Erp','Min.Trace',fnc.SysGetAttrValue('MinOuterTraceJob'),'');
+  //        SysRouteInsAttribute('Erp','Min.Trace Tol.',Fnc.SysGetAttrValue('OutTraceTol'),'');
+  end;
+
+  if (fnc.SysGetAttrValue('Flash')) > 0 then
+    SysRouteInsAttribute('Erp', 'FlashCycle', Fnc.SysGetAttrValue('Flash'), '');
+
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 1.85, '');
+
+end;

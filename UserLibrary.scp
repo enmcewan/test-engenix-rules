@@ -1,0 +1,417 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+{===============================================                                                                                                                                                                               
+Library with all kond of user specific routines
+that are called from the standard Cimnet scripts
+================================================}
+
+{-----------------------------------------------
+Generate a new MfgPartnumber when interfacing with
+the Erp systems to insert new MfgParts. Parameters
+passed in the JobParamlist: JobParamList.Strings[x]
+
+x =  0 Engenix JobId (Jobs.JobId)
+x =  1 Engenix Internal JobRev (Jobs.Revision)
+x =  2 Engenix JobName (Jobs.JobName)
+x =  3 Engenix CustomerCode (Customers.???????)
+x =  4 Engenix CustomerName (Customers.CustomerName)
+x =  5 Engenix CustPartNumber (PartNumbers.PartNumberName)
+x =  6 Engenix CustPartDescription (PartNumbers.PartDescription)
+x =  7 Engenix CustPartRev (PartNumbers.Revision)
+x =  8 Engenix UniqueId for each MfgPart inside Job
+x =  9 Engenix Bom Level
+x = 10 Engenix Sequence within same level
+x = 11 Seq of the TopLayer for this MfgPart
+x = 12 Seq of the BottomLayer for this MfgPart
+x = 13 MfgPart Unique seq Character
+-------------------------------------------------} 
+
+{== public routine =====================================================
+Update the JobAttributes. JobParamList contains data in the form
+Param-x=Value. The Param-x is the name of a user defined JobAttribute
+(JobAttribute table), the value is the new value that should be stored
+at the current job. If the value is not in the appropriate format, update
+for this parameter will be skipped
+=========================================================================}
+function SysEngnxUpdateJobAttribute(JobParamList: TStringList): Boolean;
+var
+  I01: integer;
+  AttrDefTable: TAdoTable;
+  AttrValTable: TAdoTable;
+  FldIndx: integer;
+  FldType: integer;
+  FldName: string;
+  FldValue: string;
+  ErrorMsg: string;
+begin
+  ErrorMsg := '';
+  Result := true;
+  // Open the Attribute definition tabel
+  AttrDefTable := TAdoTable.Create(nil);
+  AttrDefTable.Connection := Fnc.DbConnection;
+  AttrDefTable.TableName := 'JobAttributes';
+  AttrDefTable.Active := true;
+  // Open the Attribute Values table
+  AttrValTable := TAdoTable.Create(nil);
+  AttrValTable.Connection := Fnc.DbConnection;
+  AttrValTable.TableName := 'JobAnswers';
+  AttrValTable.Active := true;
+
+  if Fnc.JobId <= 0 then
+    showmessage('Invalid/No Job Selected')
+  else begin
+    // Loop through the list and process
+    for I01 := 0 to JobParamList.Count - 1 do begin
+      // get the Name and the Value of the User Attribute
+      FldName := JobParamList.Names[I01];
+      FldValue := JobParamList.Values[FldName];
+      if AttrDefTable.Locate('AttributeName', FldName, SetOf(loCaseInsensitive)) = false then begin // 2003-01-11
+         if ErrorMsg = '' then
+            ErrorMsg := 'Procedure: SysEngnxUpdateJobAttribute' + #13;
+         ErrorMsg := ErrorMsg + #13 + 'Invalid Job Attribute FieldName: ' + FldName;
+      end // error
+      else begin
+        FldType := AttrDefTable.FieldByName('AttributeType').Value;
+        // Check if the Value is valid for the given type
+        if Fnc.SysValidateTypeAndValue(FldType, FldValue) = true then begin
+
+          // Insert or Update the JobAbswer table
+          if AttrValTable.Locate('JobId;JobAttributeId',
+                                 [Fnc.JobId,AttrDefTable.FieldByName('JobAttributeId').Value],
+                                 SetOf(loCaseInsensitive)) = true then // 2003-01-11
+            AttrValTable.Edit
+          else begin
+            AttrValTable.Append;
+            AttrValTable.FieldByName('JobAttributeId').Value :=
+                                 AttrDefTable.FieldByName('JobAttributeId').Value;
+            AttrValTable.FieldByName('JobId').Value := Fnc.JobId;
+          end; // Insert
+          AttrValTable.FieldByName('EntryValue').Value := FldValue;
+          AttrValTable.FieldByName('EntryDate').Value := Now;
+          AttrValTable.Post;
+        end // Valid Value
+        else begin
+          if ErrorMsg = '' then
+             ErrorMsg := 'Procedure: SysEngnxUpdateJobAttribute' + #13;
+          ErrorMsg := ErrorMsg + #13 + 'FieldName: ' + FldName +
+                               ' Invalid value: ' + FldValue;
+        end; // errormsg for filedtype
+      end; // Valid Attribute Name
+    end; // JobParamList
+  end; // Invalid Job
+
+  if ErrorMsg <> '' then
+     showmessage(ErrorMsg);
+
+  // Close and Free the Tables
+  AttrDefTable.Close;
+  AttrDefTable.Free;
+  AttrValTable.Close;
+  AttrValTable.Free;
+end;
+
+function ErpNewMfgPartNumberParadigmOk(MfgPartNum: string; CustCode: string;
+                                       CustPartNum: string; CustPartRev: string): boolean;
+var
+   D17: TSysTable;
+   D25: TSysTable;
+   D50: TSysTable;
+   D10: TSysTable;
+begin
+   Result := true;
+
+   D17 := Fnc.AstaExecuteSQL('SELECT * FROM Data0017 WHERE Data0017.Inv_Part_Number = ' + QuotedStr(MfgPartNum));
+   if not D17.IsEmpty then begin
+      // There is a TopLevel MfgPart with the InvPartNumber
+      D17.First;
+      D25 := Fnc.AstaExecuteSQL('SELECT * FROM Data0025 WHERE Data0025.Inventory_Ptr = ' +
+                                D17.FieldByName('RKey').AsString);
+      if not D25.IsEmpty then begin
+         // The MfgPart is used in a Bom, get all MfgParts linked to this Bom
+         D50 := Fnc.AstaExecuteSQL('SELECT * FROM Data0050 WHERE Data0050.Bom_Ptr = ' +
+                                   D25.FieldByName('RKey').AsString);
+         if not D50.IsEmpty then 
+         begin
+            D10 := Fnc.AstaExecuteSQL('SELECT * FROM Data0010 WHERE Data0010.Cust_Code = ' + QuotedStr(CustCode));
+            // If there are Cust.Parts linked to this Bom, but the one we have now
+            // is not in the list, we have to increment the Sequence
+            if not D50.Locate('Customer_Ptr;Customer_Part_Number;Cp_Rev',
+                              [D10.FieldByName('RKey').AsInteger, CustPartNum, CustPartRev],
+                               SetOf([])) then
+               Result := false;
+            D10.Free;     
+         end;
+         D50.Free;
+      end;
+      D25.Free;
+   end;
+   D17.Free;
+end;
+
+{-----------------------------------------------------------------
+Procedure to PostProcess the Barco layernames
+------------------------------------------------------------------}
+procedure BarcoClnUpLayerNameUpdate(BarcoLayerTab: TSysTable);
+begin
+end;
+
+{----------------------------------------------------
+Procedure to cleanup the ToolTable before displaying
+it to the user. The standard function retrieves all
+fields, here we can set columns position, size, etc
+-----------------------------------------------------} 
+{procedure ToolControlCleanup(ToolContrTab: TSysTable);
+begin
+   with ToolContrTab do begin
+      //====== Set the display sequence (from left to right)
+      FieldByName('Layer').Index := 0;
+      FieldByName('ToolControl').Index := 1;
+      FieldByName('ToolName').Index := 2;
+      FieldByName('ToolRev').Index := 3;
+      FieldByName('ToolDate').Index := 4;
+      FieldByName('ToolTime').Index := 5;
+      //====== Change the Display HeaderName
+      FieldByName('ToolControl').DisplayLabel := 'Seq.';
+      FieldByName('ToolName').DisplayLabel := 'Tool';
+      FieldByName('ToolRev').DisplayLabel := 'Rev.';
+      FieldByName('ToolDate').DisplayLabel := 'Date';
+      FieldByName('ToolTime').DisplayLabel := 'Time';
+      //====== Set the DisplayWidth of the column
+      FieldByName('ToolControl').DisplayWidth := 5;
+      FieldByName('ToolName').DisplayWidth := 30;
+      FieldByName('ToolRev').DisplayWidth := 5;
+      FieldByName('ToolDate').DisplayWidth := 10;
+      FieldByName('ToolTime').DisplayWidth := 10;
+   end;
+end;
+}
+{-----------------------------------------------------
+Function to automate generation of the ToolName. This
+function is called from the Odb++ CleanUp scripts and
+from the ToolMaintenance script
+Parameters passed in the ToolParamList.Strings[x]:
+x = 0 : LayerName
+x = 1 : JobID
+x = 2 : Job Revision
+x = 3 : JobName
+------------------------------------------------------}
+function ToolControlToolName(ToolParamList: TStringList): string;
+begin
+   Result := ToolParamList.Strings[0];
+end;
+
+{------------------------------------------------------
+ convert the copper weigth to a copper thickness
+-------------------------------------------------------}
+function StkUpCuWeightToThickness(CuWeight: string): result;
+begin
+   result := CuWeight / (1/0.0014);
+end;
+
+{== Custom Script =================================================
+Update the JobAttributes with a script. Attribute values can be
+calculated, entered in a script, come from detailed data
+from the job, etc.
+===================================================================} 
+
+function GetValue(aSeq: integer; aString: string): string;
+var
+    TempList: TStringList;
+begin
+    TempList := TStringList.Create;
+    TempList.Text := aString;
+    if aSeq > TempList.Count then
+        Result := ''
+    else
+    Result := TempList.Strings[aSeq];
+    TempList.Free;
+end;
+
+procedure UpdateJobAttributes;
+var
+  JobAttrList: TStringList;
+  layerinfoList : TStringList;
+  i : integer;
+begin
+  Fnc.MouseBusy;
+
+  // Create a list to store the names/values to update               
+  JobAttrList := TStringList.Create;
+
+  // Core MAterial
+  JobAttrList.Add('Material=' + Fnc.SysGetAttrValueTopLevel('CoreMat'));
+  JobAttrList.Add('Board Thickness=' + FloatToStr(Fnc.SysGetAttrValueTopLevel('LayupThickness'))); 
+{
+  // Number of Layers
+  JobAttrList.Add('# of Layers=' + IntToStr(Fnc.SysCountItemTypeFromTree(cStackupLayer)));
+
+  //Aspect Ratio
+  JobAttrList.Add('Aspect Ratio=' + copy(Fnc.SysGetAttrValueTopLevelFromTree('AspectRatio'), 1, 5));
+
+  //Finish Type
+  JobAttrList.Add('Finish Type=' + Fnc.SysGetAttrValueTopLevelFromTree('FinishType'));
+                         
+  //Silver Fill
+  JobAttrList.Add('Silver Fill=' + Fnc.SysGetAttrValueTopLevelFromTree('SF'));
+
+  //Board Thickness
+  JobAttrList.Add('Board Thickness=' + Fnc.SysGetAttrValueTopLevelFromTree('LayupThickness')); 
+
+  //Smallest Hole Size
+  JobAttrList.Add('Smallest Drilled Hole=' + Fnc.SysGetAttrValueTopLevelFromTree('SmallDrill'));
+
+  //Rules Version
+  JobAttrList.Add('Rules Version=' + Fnc.SysGetAttrValueTopLevelFromTree('RuleVer'));
+
+  //OutSide Process
+  JobAttrList.Add('Outside Services=' + Fnc.SysGetAttrValueTopLevelFromTree('OutService'));
+
+  //Outer Line Width
+  JobAttrList.Add('Outer Linewidth=' + Fnc.SysGetAttrValueTopLevelFromTree('MinOuterTraceJob'));
+
+  //Outer Space
+  JobAttrList.Add('Outer Space=' + Fnc.SysGetAttrValueTopLevelFromTree('MinOuterSpaceJob'));
+
+  //Outer Annular Ring
+  JobAttrList.Add('Outer Annular Ring=' + Fnc.SysGetAttrValueTopLevelFromTree('MinOuterAnnRingJob'));
+
+  //Inner LineWidth
+  JobAttrList.Add('Inner Linewidth=' + Fnc.SysGetAttrValueTopLevelFromTree('MinInnerTraceJob'));
+
+  //Inner Space
+  JobAttrList.Add('Inner Space=' + Fnc.SysGetAttrValueTopLevelFromTree('MinInnerSpaceJob'));
+
+  //Inner Annular Ring
+  JobAttrList.Add('Inner Annular Ring=' + Fnc.SysGetAttrValueTopLevelFromTree('MinInnerAnnRingJob'));
+
+  //Inner Hole to Copper
+  JobAttrList.Add('Inner Hole to Cu.=' + Fnc.SysGetAttrValueTopLevelFromTree('MinInnerHoleToCopperJob'));
+
+  //Panel Length
+  JobAttrList.Add('Panel Length=' + Fnc.SysGetAttrValueTopLevelFromTree('PanelLength'));
+
+  //Panel Width
+  JobAttrList.Add('Panel Width=' + Fnc.SysGetAttrValueTopLevelFromTree('PanelWidth'));
+
+  //Board Size X
+  JobAttrList.Add('Board Size X=' + Fnc.SysGetAttrValueTopLevelFromTree('boardsizex'));
+
+  //Board Size Y
+  JobAttrList.Add('Board Size Y=' + Fnc.SysGetAttrValueTopLevelFromTree('boardsizey'));
+
+  //Total # of Holes                     
+  JobAttrList.Add('Total # Holes=' + Fnc.SysGetAttrValueTopLevelFromTree('TotNumHoles'));
+}
+  {
+  layerinfoList := TStringList.Create;
+  layerinfoList := Fnc.SysGetAllItemAttrValueList('ItemLayerName;ItemMatrlDesc');
+  
+  for i := 0 to layerinfoList.Count -1 do
+  begin
+      ShowMessage(layerinfoList.Strings[i]);  
+  end;
+  }
+  //ShowMessage(Fnc.SysGetListOfLayerNames(cStackupLayer).Count);
+  // Update the Job Attributes
+  SysEngnxUpdateJobAttribute(JobAttrList);
+
+  JobAttrList.Free;
+
+  Fnc.MouseNormal;
+end;
+
+{===== After Route is saved }
+procedure UserProcSaveRouteToTree;
+begin
+end;
+
+{
+===== Create Erp MfgPart Number & Names
+ParamList.Values['JobId']
+ParamList.Values['JobRev']
+ParamList.Values['JobName']
+ParamList.Values['CustCode']
+ParamList.Values['CustName']
+ParamList.Values['CustPartNum']
+ParamList.Values['CustPartRev']
+ParamList.Values['CustPartDesc']
+ParamList.Values['BomLevel']
+ParamList.Values['BomLevelSeq']
+ParamList.Values['PartType'] // (Value = TOOL or MFGPART)
+ParamList.Values['TopLayer']
+ParamList.Values['TopLayerSeq']
+ParamList.Values['BottomLayer']
+ParamList.Values['BottomLayerSeq']
+ParamList.Values['CombinedMfgPart']
+ParamList.Values['CombinedLayers']
+ParamList.Values['MfgPartUniqueSeq']
+}
+
+
+procedure UserExportToParadigmCostRollup;
+var
+  ParamList: TStringList;
+  MapList: TStringList;
+begin
+  MapList := TStringList.Create;
+{
+  If no Bom Rollup is required, the MapList can be left empty. If a Bom
+  Rollup should be done, then map the fixed Costing Fieldnames to Attribute
+ names that the function will write the data
+}
+{
+  MapList.Add('CostSetup=BomCostSetup');
+  MapList.Add('CostDirMatrl=BomCostDirMatrl');
+  MapList.Add('CostIndirMatrl1=BomCostIndirMatrl1');
+  MapList.Add('CostIndirMatrl2=BomCostIndirMatrl2');
+  MapList.Add('CostProcess=BomCostProcess');
+  MapList.Add('CostOverHead=BomCostOverHead');
+}
+  ParamList := TStringList.Create;
+{
+  Specify if there should be a Yield applied. If no entry, no additional
+  calculation will be done, if a filedname (AttributeName) is specified,
+  then the cost for each individual MfgPart will be:
+  Cost * (100 / Yield)
+}
+
+//  ParamList.Add('YieldMfgPart=Yield');
+
+{
+  Specify if there should be a Yield applied on the MfgPart Rollup.
+  If no etry, no additional calculation will be done, if an attribute
+  name is specified, this field will be used in accumulating the cost
+  of the child MfgParts. If there is already a Yield specified for the
+  MfgPart, the cost for the current MfgPart will be used as calculated
+  in the MfgPart Rollup
+}
+
+//  ParamList.Add('YieldBom=Yield');
+
+{
+  Eventualy specify costing components that should be excluded from the
+  Yield correction (like Setup Cost). If there is a Bom Rollup Map specified,
+  include the name of that field that should be excluded.
+}
+
+//  ParamList.Add('CostSetup=NoYield');
+//  ParamList.Add('BomCostSetup=NoYield');
+
+{
+  Option to specify that there should be a one-field-total calculated, this
+  an be specified for the MfgPart and/or the Bom Rollup
+}
+{
+  ParamList.Add('MfgPartTotalCost=TotalMfgPartCost');
+  ParamList.Add('BomTotalCost=TotalBomCost');
+}
+
+//  Fnc.CostRollup(ParamList, MapList);
+
+  MapList.Free;
+  ParamList.Free;
+end;

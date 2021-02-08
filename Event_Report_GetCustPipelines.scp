@@ -1,0 +1,54 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Reports
+//HeaderImportExport<--
+{ Script runs as a pre-processor for each report.
+
+ParamList.Values['ReportName'] = name of the report 
+ParamList.Values['MfgPartName'] = name of the MfgPart as this is a MfgPart report
+ParamList.Values['LayerName'] = name of the Layer as this is a Layer report
+                                          
+For Job Reports, both MfgPart- and LayerName are blank/spaces. 
+
+User can create TSysTables with the Fnc.SysTableCreate(....); Define the fields
+and populate the tables. Pass back the name(s) of the create tables like:  
+                                                 
+ParamList.Values['CustPipeline01'] := aTable_1.Name;
+ParamList.Values['CustPipeline02'] := aTable_2.Name;
+........
+ParamList.Values['CustPipeline10'] := aTable_....Name;                   
+                                            
+The limit is 10 custom table/pipelines per report
+
+All tables will be destroyed/released by Engenix as the report is finished.
+                                   
+Hint: it's safer to pass back the actual name like aTable.Name, as Engenix creates
+the table, the actual name can be different then the specified name in the
+SysCreateTable as there might be duplicate names for tables.
+}
+
+procedure Report_GetCustPipelines(ParamList: TStringList);
+var
+  aTable: TSysTable;
+begin
+//  Fnc.SendDebugSeparator;
+//  Fnc.SendDebugString('ReportName: ' + ParamList.Values['ReportName']);
+//  Fnc.SendDebugString('MfgPartName: ' + ParamList.Values['MfgPartName']);
+//  Fnc.SendDebugString('LayerName: ' + ParamList.Values['LayerName']);
+  
+//  aTable := Fnc.SysTableCreate('myPipeLine1'); 
+//  ... create the fields and fill the records
+//  ParamList.Values['CustPipeline1'] := aTable.Name;
+  
+//  aTable := Fnc.SysTableCreate('myPipeLine2');
+//  ... create the fields and fill the records
+//  ParamList.Values['CustPipeline2'] := aTable.Name;
+  //Fnc.SysStackupGetMaterialList(99, true, 'Foil;PP/Filler;Core',
+  Fnc.OpenDataGrid(Fnc.SysStackupTable);
+end;
+
+begin
+//Fnc.OpenDataGrid(Fnc.SysStackupTable); 
+END;

@@ -1,0 +1,167 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Route Gen/Regen
+//HeaderImportExport<--
+Uses
+  ParadigmLibrary;
+
+function GetParadigmSoData: TSysTable;
+var
+  QryStr: string;
+  SoNum: string;
+  SoTab: TSysTable;
+  OptionList: TStringList;
+begin
+  SoNum := '';
+  // Get a list with So's
+
+  QryStr :=
+'Select Data0060_1.SALES_ORDER as "Sales Order", ' +
+        'CAST(Data0060_1.RKey AS Integer) as RKEY, ' +
+     //   'Data0060_1.RKEY as RKEY, '+
+        'Data0060_1.P_CODE as Priority, '+
+        'Data0060_1.STATUS as Status, ' +
+        'Data0097_1.PO_NUMBER as PO, '+
+        'Data0010_1.CUSTOMER_NAME as Customer, '+                 
+        'Data0050_1.CUSTOMER_PART_NUMBER as "Part No", '+      
+        'Data0050_1.CP_REV as Rev, '+
+        'Data0060_1.SCH_DATE as "Ship Date", '+
+        'Data0060_1.PART_PRICE as Price, '+
+        'Data0060_1.TOTAL_ADD_L_PRICE as Tooling, '+
+        'Data0060_1.PARTS_ORDERED as Qty '+
+
+
+'From'+
+'     DATA0060 DATA0060_1,'+
+'     DATA0010 DATA0010_1, '+
+'     DATA0050 DATA0050_1,   '+
+'     DATA0097 DATA0097_1    '+
+
+'Where'+                                
+     ' Data0060_1.Status = 1 and ' +
+     '(Data0060_1.CUSTOMER_PTR = Data0010_1.RKEY) AND' +
+     '(Data0060_1.CUST_PART_PTR = Data0050_1.RKEY) AND' +
+     '(Data0060_1.PURCHASE_ORDER_PTR = Data0097_1.RKEY)' +
+
+'Order By Data0060_1.RKEY ' ;
+
+  SoTab := Fnc.AstaExecuteSql(QryStr);
+  if SoTab = nil then
+     showmessage('Invalid Data returned from Asta')
+  else begin
+     SoTab.First;
+     // Added Display Options
+     OptionList := TStringList.Create;
+     OptionList.Add('KeyField=RKEY');
+     OptionList.Add('Hide=RKEY');
+
+
+
+
+   //  OptionList.Add('CustomFilter=Yes');
+     if Fnc.OpenDataGrid(SoTab, OptionList, nil, true) = 1 then
+        SoNum := SoTab.FieldByName('Sales Order').Value;
+     OptionList.Free;
+  end;
+
+  // If No SalesOrder selected, give option to key-in
+  if SoNum = '' then
+    SoNum := InputBox('SalesOrders', 'Enter Paradigm SalesOrderNumber', '');
+
+  // We have a SalesOrder, Get the details
+  Result := nil;
+  if SoNum <> '' then
+  begin
+    QryStr := 'Select' +
+              ' Data0060.Sales_Order as Sales_Order,' +
+              ' Data0060.Due_Date as Due_Date,' +
+              ' Data0060.Sch_Date as Sch_Date,' +
+              ' Data0010.Cust_Code as Cust_Code,' +
+              ' Data0010.Abbr_Name as Abbr_Name,' +
+              ' Data0010.Customer_Name as Customer_Name,' +
+              ' Data0050.Customer_Part_Number as Customer_Part_Number,' +
+              ' Data0050.Customer_Part_Desc as Customer_Part_Desc,' +
+              ' Data0050.Cp_Rev as Cp_Rev' +
+              ' from Data0060, Data0010, Data0050' +
+              ' where' +
+              ' Data0060.SALES_ORDER=' + QuotedStr(SoNum) + ' and' +
+              ' Data0010.RKey=Data0060.Customer_Ptr and' +
+              ' Data0050.RKey=Data0060.Cust_Part_Ptr';
+    Result := Fnc.AstaExecuteSql(QryStr);
+    if Result.RecordCount = 0 then begin
+       Result.Close;
+       Result.Free;
+       Result := nil;
+    end;
+  end; // So <> ''
+
+  SoTab.Close;
+  Fnc.SysTableDestroy(SoTab);
+
+end;
+
+{== Custom Script =================================================
+User gets a list with Active salesorders in Paradigm and select one,
+or he can key-in the So number. Detailed data is retrieved from           
+Paradigm, and JobData is updated in Engenix
+===================================================================}
+procedure UpdateJobDataFromParadigm;
+var
+  ParQry: TSysTable;
+  CustomerId: integer;
+  PartNumId: integer;
+  JobParamList: TStringList;
+begin
+  Fnc.MouseBusy;
+  ParQry := GetParadigmSoData;
+  if ParQry = nil then
+    showmessage('No Valid SalesOrder Data selected')
+  else
+    begin
+    ParQry.First;
+    // Insert/Check for the customer in the Engenix DataBase
+    CustomerId := SysEngnxCheckCustomer(true, ParQry.FieldByName('Customer_Name').AsString,
+                                              ParQry.FieldByName('Abbr_Name').AsString,
+                                              ParQry.FieldByName('Cust_Code').AsString);
+    if CustomerId <> 0 then
+      begin
+      // Check/Insert the Customer Part Number
+      PartNumId := SysEngnxCheckCustPart(
+                          true, CustomerId,
+                          ParQry.FieldByName('Customer_Part_Number').Value,
+                          ParQry.FieldByName('Customer_Part_Desc').Value,
+                          ParQry.FieldByName('Cp_Rev').Value);
+      end;
+    // if valid CustId + CustPartNumId then update Job
+    if (CustomerId <> 0) and (PartNumId <> 0) then
+      begin
+      // Update the JobRecord
+      JobParamList := TStringList.Create;
+      JobParamList.Add('CustomerId=' + IntToStr(CustomerId));
+      JobParamList.Add('PartNumberId=' + IntToStr(PartNumId));
+      JobParamList.Add('RevisionDate=' + DateToStr(Date)); // (Format: DD/MM/YY)
+      SysEngnxUpdateJob(JobParamList);
+      JobParamList.Free;
+      end;
+    // Update Job Attributes
+    {JobParamList := TStringList.Create;
+    JobParamList.Add('Due date=' + DateToStr(ParQry.FieldByName('Due_Date').Value));
+    SysEngnxUpdateJobAttribute(JobParamList);
+    JobParamList.Free;}
+
+    ParQry.Close;                                    
+    ParQry.Free;
+    Fnc.RefreshJobData;
+    end;
+
+
+  Fnc.MouseNormal;
+end;
+
+procedure StackupUserEvent1(ParamList: TStringList);
+
+begin
+ UpdateJobDataFromParadigm;
+end;

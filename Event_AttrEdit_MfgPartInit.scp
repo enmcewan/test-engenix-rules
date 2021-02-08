@@ -1,0 +1,22 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Attribute Edit
+//HeaderImportExport<--
+procedure AttrEdit_MfgPartInit(ParamList: TStringList; AttrTable: TSysTable; SpecTable: TSysTable);
+
+begin
+  Fnc.SysAttrEditSetAttrValue('Pitch', 9.99);
+  //ShowMessage(Fnc.SysAttrEditGetAttrValue('Pitch'));
+  //ShowMessage(ParamList.text);
+  Fnc.SysAttrEditSetAttrValue('ResistType', 'Alpha 6'); //set all Mfg Part Values
+
+  //showmessage(Paramlist.Values['ItemType']);
+  if Paramlist.Values['ItemType'] = 'MFGSB' then   //inners only
+  begin
+    //ShowMessage('Updating Mfg Part');
+    Fnc.SysAttrEditSetMfgPartAttrValue(Paramlist.Values['MfgPartName'], 'ResistType', 'Beta 1', false,false);
+  end;
+end;
+

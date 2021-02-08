@@ -1,0 +1,585 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+uses
+  Event_RouteGenLibrary, RouteFunctions, Eng_RouteFunctions, Eng_DrillFunctions;
+
+procedure CuFlashDetails;
+begin
+  SysRouteInsDepartment('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsInstruction('Erp', 'CUP021 ', '');
+
+  if fnc.SysGetAttrValue('PanelLength') = 18 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '45', '');
+  end;
+  if fnc.SysGetAttrValue('PanelLength') = 24 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '90', '');
+  end;
+  if fnc.SysGetAttrValue('PanelLength') = 26 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '108', '');
+  end
+  else
+  begin
+  end;
+
+  SysRouteInsAttribute('Erp', 'CuCURRENT', '  ', '');
+  SysRouteInsAttribute('Erp', 'Cu TANK', '  ', '');
+  SysRouteInsAttribute('Erp', 'TIME', '  ', '');
+
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 0.25, '');
+
+end;
+
+procedure CuPlateDetails;
+begin
+  SysRouteInsDepartment('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsAddlParameter('', 'Desmear Conditions', 'HM-Rinse-Bake-DM2-HM2', '', '', false, '', '', '');
+  //SysRouteInsAttribute('Erp', 'CuPltThk', fnc.SysGetAttrValue('CuPltThk'), '');
+  SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '   ', '');
+   if fnc.SysGetAttrValue('PanelLength') = 18 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '45', '');
+  end;
+  if fnc.SysGetAttrValue('PanelLength') = 24 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '90', '');
+  end;
+  if fnc.SysGetAttrValue('PanelLength') = 26 then
+  begin
+    SysRouteInsAttribute('Erp', 'CuAMPS/PNL', '108', '');
+  end                                                   
+  else
+  begin
+  end;
+
+  SysRouteInsAttribute('Erp', 'CuCURRENT', '  ', '');
+  SysRouteInsAttribute('Erp', 'Cu TANK', '  ', '');
+  SysRouteInsAttribute('Erp', 'TIME', '  ', '');
+
+  if MfgPartType = 'Sub' then
+    SysRouteInsStepCopper(0.001, 0.0, 0.001, 0.0);
+  else
+    SysRouteInsStepCopper(0.0015, 0.0, 0.0015, 0.0);
+end;                              
+
+procedure TDRTestDetail;        
+begin
+  SysRouteInsDepartment('Erp', 'ELTEST-D', '');
+  SysRouteInsWorkCenter('Erp', 'TDRTEST', '');
+  SysRouteInsInstruction('Erp', 'INS024', '');
+end;
+
+procedure DrillStepDetails;
+var
+  AspectRatioStringValue: string;
+begin
+  SysRouteInsDepartment('Erp', 'DRILLS-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'DRILLS-D  ', '');
+  SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('DrillPrgName'), '');
+  SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('DrillPrgDate'), '');
+  //SysRouteInsInstruction('Erp', 'DRL016   ', '');
+  SysRouteInsInstruction('Erp', 'INS017   ', '');
+  SysRouteInsAttribute('Erp', 'UNIT#', '  ', '');
+  SysRouteInsAttribute('Erp', 'Small.Hole', fnc.SysGetAttrValue('SmallDrill'), '');
+  AspectRatioStringValue := copy(fnc.SysGetAttrValue('AspectRatio'), 1, 5);
+  SysRouteInsAttribute('Erp', 'AspectRatio', AspectRatioStringValue, '');
+  SysRouteInsAttribute('Erp', 'HoleToCu', fnc.SysGetAttrValue('MinInnerHoleToCopperJob'), '');
+
+  GetFlipDrill;
+  GetCoreType;
+  // Determine parameters for drilling.
+  GetLayerCount; //From Route Functions
+  if (fnc.SysGetAttrValue('LayupThickness') <= 125) and
+    ((CoreMatType = 'FR4') or (CoreMatType = 'HTFR4')) then
+  begin
+    SysRouteInsInstruction('Erp', 'DRL017', '');
+  end;
+  if (fnc.SysGetAttrValue('LayupThickness') > 125) and
+    (fnc.SysGetAttrValue('LayupThickness') <= 250) and
+    ((CoreMatType = 'FR4') or (CoreMatType = 'HTFR4')) then
+  begin
+    SysRouteInsInstruction('Erp', 'DRL018', '');
+  end;
+  if ((CoreMatType = 'FR4') or (CoreMatType = 'HTFR4')) and
+    (LayerCount <= 2) then
+  begin
+    SysRouteInsInstruction('Erp', 'DRL019', '');
+  end;
+
+  //if fnc.SysGetAttrValue('SF') = true then
+  //ShowMessage(fnc.SysGetAttrValue('SF'));
+  if (fnc.SysGetAttrValue('SF') = 'TopSideFlat') or
+    (fnc.SysGetAttrValue('SF') = 'BotSideFlat') or
+    (fnc.SysGetAttrValue('SF') = 'Both') then //true then
+  begin
+    if FlipDrill = true then
+    begin
+      SysRouteInsInstruction('Erp', 'DRL015    ', '');
+      SysRouteInsInstruction('Erp', 'DRL008    ', '');
+      SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('DrillPrgName'), '');
+      SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('DrillPrgDate'), '');
+    end
+    else
+      SysRouteInsInstruction('Erp', 'DRL015    ', '');
+  end
+  else
+  begin
+    if FlipDrill = true then
+    begin
+      SysRouteInsInstruction('Erp', 'DRL008    ', '');
+      SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('DrillPrgName'), '');
+      SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('DrillPrgDate'), '');
+    end;
+  end;
+
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 0.77, '');
+end;
+
+procedure SecDrillStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'DRILLS-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SECDRL-WC  ', '');
+ // if MfgPartType <> 'Too' then
+  begin
+    SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('DrillPrgName'), '');
+    SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('DrillPrgDate'), '');
+  end;
+  begin
+    if fnc.SysGetAttrValue('Allentown') = true then
+      SysRouteInsInstruction('Erp', 'DRL011', '');
+  end;
+end;
+
+procedure PowerWashDetails;
+begin
+  SysRouteInsDepartment('Erp', 'HOLEPR-D ', '');
+  SysRouteInsWorkCenter('Erp', 'HOLEPR-PW ', '');
+  SysRouteInsInstruction('Erp', 'SUR013 ', '');
+end;
+
+procedure InspectHolesDetails;
+begin
+  SysRouteInsDepartment('Erp', 'HOLEINS-D', '');
+  SysRouteInsWorkCenter('Erp', 'HOLEINS-WC', '');
+  SysRouteInsInstruction('Erp', 'INS026', '');
+end;
+
+procedure ElectroTinStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'ELECTTIN-W  ', '');
+  SysRouteInsInstruction('Erp', 'CUP005    ', '');
+  SysRouteInsAttribute('Erp', 'SnAmps/Pnl', '  ', '');
+end;
+
+procedure ETStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'ELTEST-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'ELTEST-D  ', '');
+  if ((Fnc.SysGetAttrValue('ENAHardGold') = false) and
+    (Fnc.SysGetAttrValue('ENAAuThickThk') = true)) then
+    SysRouteInsInstruction('Erp', 'ELT009    ', '');
+  if Fnc.SysGetAttrValue('HighVoltage') = true then
+    SysRouteInsInstruction('Erp', 'ELT002    ', '')
+  else
+    SysRouteInsInstruction('Erp', 'ELT001    ', '');
+end;
+
+procedure FinalStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'FINALV-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'FINALV-D  ', '');
+  SysRouteInsInstruction('Erp', 'FIN002    ', '');
+  SysRouteInsInstruction('Erp', 'FIN003    ', '');
+  SysRouteInsInstruction('Erp', 'FIN004    ', '');
+  SysRouteInsInstruction('Erp', 'FIN005    ', '');
+  SysRouteInsInstruction('Erp', 'FIN006    ', '');
+end;
+
+procedure FinishSurPrepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SURFAC-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SURFAC-D  ', '');
+  begin
+    if fnc.SysGetAttrValue('FinishType') <> 'ElectroNickelGold' then
+      if fnc.SysGetAttrValue('LayupThickness') < 31 then
+        SysRouteInsInstruction('Erp', 'SUR004', '')
+      else
+        SysRouteInsInstruction('Erp', 'SUR003', '');
+  end;
+  begin
+    if fnc.SysGetAttrValue('FinishType') = 'ElectroNickelGold' then
+      if fnc.SysGetAttrValue('ENAHardGold') = true then
+        SysRouteInsInstruction('Erp', 'SUR009', '')
+      else
+        SysRouteInsInstruction('Erp', 'SUR005', '');
+  end;
+
+end;
+
+procedure HASLStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'IMMFIN-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'HASL  ', '');
+  SysRouteInsAttribute('Erp', 'LayupThick', fnc.SysGetAttrValue('LayupThickness'), '');
+
+  if fnc.SysGetAttrValue('SMSides') = 0 then
+    SysRouteInsInstruction('Erp', 'CUR001', '');
+
+end;
+
+procedure HolePrepAStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'HOLEPR-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'HOLEPR-D  ', '');
+  SysRouteInsInstruction('Erp', 'HLE002    ', '');
+end;
+
+procedure HDIStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'HOLEPR-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'HOLEPR-D  ', '');
+  SysRouteInsInstruction('Erp', 'HLE003  ', '');
+end;
+
+procedure ImmTinStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'IMMFIN-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'IMMTIN  ', '');
+end;
+
+procedure ImmAuStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'OUTIMMAU  ', '');
+  SysRouteInsWorkCenter('Erp', 'OUTIMMAU  ', '');
+  SysRouteInsAttribute('Erp', 'ImmAuThick', fnc.SysGetAttrValue('ImmAuThick'), '');
+  SysRouteInsAttribute('Erp', 'Ni Thick.', fnc.SysGetAttrValue('ENANiThk'), '');
+end;
+
+procedure ImmSilverStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'IMMFIN-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'IMMSI  ', '');
+end;
+
+procedure LaminationStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'MLAMIN-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'MLAMIN-D  ', '');
+  SysRouteInsAttribute('Erp', 'Lam.Cycle', fnc.SysGetAttrValue('LamCycle'), '');
+  SysRouteInsAttribute('Erp', 'Lam.Range', fnc.SysGetAttrValue('LamRange'), '');
+  //if fnc.SysGetAttrValue('FinishType')= 'Electro Nickel/Gold' then
+   // SysRouteInsInstruction('Erp', 'RES002    ', '');
+  SysRouteInsCrpParameter('Erp', 100, 800, 2.0, '');
+end;
+
+procedure MLLayupStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'MLAYUP-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'MLAYUP-D  ', '');
+  GetCoreType;
+  if ((CoreMatType = 'FR4') or (CoreMatType = 'HTFR4')) then
+  begin
+    if (Fnc.SysGetAttrValue('LayupThickness') <= 62) and
+      (fnc.SysGetAttrValue('UNBConstr') <> true) and
+      (fnc.SysGetAttrValue('Cavity') <> true) then
+      SysRouteInsInstruction('Erp', 'LAY002    ', '');
+    if ((Fnc.SysGetAttrValue('LayupThickness') >= 62) or
+      (Fnc.SysGetAttrValue('CuBot') = '2') or
+      (Fnc.SysGetAttrValue('CuTop') = '2')) and
+      (fnc.SysGetAttrValue('UNBConstr') <> true) and
+      (fnc.SysGetAttrValue('Cavity') <> true) then
+      SysRouteInsInstruction('Erp', 'LAY003    ', '');
+  end;
+  begin
+    if (Fnc.SysGetAttrValue('UNBConstr') = true) and
+      (MfgPartType <> 'Sub') then
+      SysRouteInsInstruction('Erp', 'LAY004    ', '');
+    if (Fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType <> ('Sub')) then
+      SysRouteInsInstruction('Erp', 'LAY005    ', '');
+    //Eng_FoundDrillInSub;
+      //ShowMessage('Finished Checking for drilled subs...');
+      //ShowMessage(Eng_FoundDrillInSub);
+    //if (FoundDrillFileInSub = true) and
+    if (CheckBuriedDrill(1) = true) and
+
+      (fnc.SysGetAttrValue('UNBConstr') <> true) and
+      (fnc.SysGetAttrValue('Cavity') <> true) then
+      SysRouteInsInstruction('Erp', 'LAY011    ', '');
+  end;
+end;
+
+procedure MLWaitingStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'MLWAIT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'MLWAIT-WC  ', '');
+  SysRouteInsInstruction('Erp', 'MLW001', '');
+end;
+
+procedure ElectroNiAuStepFlashDetails;
+begin
+  SysRouteInsDepartment('Erp', 'EGOLDP-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'EGOLDP-D  ', '');
+  begin
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'False' then
+      SysRouteInsInstruction('Erp', 'GLD007    ', '')
+    else
+      SysRouteInsInstruction('Erp', 'GLD010    ', '');
+    SysRouteInsAttribute('Erp', 'Ni Thick.', fnc.SysGetAttrValue('ENANiThk'), '');
+    SysRouteInsAttribute('Erp', 'Ni Amps', fnc.SysGetAttrValue('ENANiAMPS'), '');
+    SysRouteInsAttribute('Erp', 'Au Amps', fnc.SysGetAttrValue('ENAAuAMPS'), '');
+  end;
+end;
+
+procedure ElectroNiAuStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'EGOLDP-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'EGOLDP-D  ', '');
+  GetAuThick;
+  // Ni&Au
+  if Fnc.SysGetAttrValue('FinishType') = 'ElectroNickelGold' then
+  begin
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'False' then
+      if AuThick = true then
+        SysRouteInsInstruction('Erp', 'GLD003    ', '')
+      else // Not Thick
+        SysRouteInsInstruction('Erp', 'GLD007    ', '');
+    // Hard Gold
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'True' then
+      if AuThick = true then
+        SysRouteInsInstruction('Erp', 'GLD001    ', '')
+      else // Not Thick
+        SysRouteInsInstruction('Erp', 'GLD010    ', '');
+    begin
+      SysRouteInsAttribute('Erp', 'Ni Thick', fnc.SysGetAttrValue('ENANiThk'), '');
+      SysRouteInsAttribute('Erp', 'Au Thick', fnc.SysGetAttrValue('ENAAuThickThk'), '');
+      SysRouteInsAttribute('Erp', 'Ni Amps', fnc.SysGetAttrValue('ENANiAMPS'), '');
+      SysRouteInsAttribute('Erp', 'Au Amps', fnc.SysGetAttrValue('ENAAuAMPS'), '');
+    end;
+  end;
+
+  //Ni Only
+  if Fnc.SysGetAttrValue('FinishType') = 'ElectroNickel' then
+  begin
+    SysRouteInsInstruction('Erp', 'GLD005    ', '');
+    SysRouteInsAttribute('Erp', 'Ni Amps', fnc.SysGetAttrValue('ENANiAMPS'), '');
+  end;
+  //Au Only
+  if Fnc.SysGetAttrValue('FinishType') = 'ElectroGold' then
+  begin
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'False' then
+      if AuThick = true then
+        SysRouteInsInstruction('Erp', 'GLD004    ', '')
+      else // Not Thick
+        SysRouteInsInstruction('Erp', 'GLD011    ', '');
+    // Hard Gold
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'True' then
+      if AuThick = true then
+        SysRouteInsInstruction('Erp', 'GLD002    ', '')
+      else // Not Thick
+        SysRouteInsInstruction('Erp', 'GLD010    ', '');
+    begin
+      SysRouteInsAttribute('Erp', 'Au Thick', fnc.SysGetAttrValue('ENAAuThickThk'), '');
+      SysRouteInsAttribute('Erp', 'Au Amps', fnc.SysGetAttrValue('ENAAuAMPS'), '');
+    end;
+  end;
+
+  //if Fnc.SysGetAttrValue('ENAType')='None' then
+  //  ShowMessage('WARNING!! Electro Ni/Au Type Not Selected');
+
+end;
+
+procedure ElectroAuOnlyStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'EGOLDP-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'EGOLDP-D  ', '');
+  begin
+    if Fnc.SysGetAttrValue('ENAHardGold') = 'False' then
+      SysRouteInsInstruction('Erp', 'GLD004    ', '')
+    else
+    begin
+      SysRouteInsInstruction('Erp', 'GLD002    ', '');
+      SysRouteInsAttribute('Erp', 'Au Thick', fnc.SysGetAttrValue('ENAAuThickThk'), '');
+      SysRouteInsAttribute('Erp', 'Au Amps', fnc.SysGetAttrValue('ENAAuAMPS'), '');
+    end;
+  end;
+
+end;
+
+procedure OuterSurPrepStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SURFAC-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'ACID  ', '');
+  begin
+    if fnc.SysGetAttrValue('LayupThickness') < 31 then
+      SysRouteInsInstruction('Erp', 'SUR004', '')
+    else
+      SysRouteInsInstruction('Erp', 'SUR003', '');
+  end;
+end;
+
+procedure SandSurfaceStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SURFAC-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SAND  ', '');
+  begin
+    if (fnc.SysGetAttrValue('PltDotShotBB') = true) or
+      (fnc.SysGetAttrValue('PltDotShot') = true) then
+    begin
+      SysRouteInsInstruction('Erp', 'SUR100', '');
+    end;
+  end;
+  begin
+    if (Fnc.SysGetAttrValue('SF') = 'TopSideFlat') or
+      (Fnc.SysGetAttrValue('SF') = 'BotSideFlat') or
+      (Fnc.SysGetAttrValue('SF') = 'Both') then
+      SysRouteInsInstruction('Erp', 'SIL007', '');
+  end;
+end;
+
+procedure LaserDrillStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'LASER-D', '');
+  SysRouteInsWorkCenter('Erp', 'LASER-WC', '');
+  SysRouteInsInstruction('Erp', 'LSR015', '');
+  SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('LaserDrillName'), '');
+  SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('LaserDrillDate'), '');
+  SysRouteInsAttribute('Erp', 'MAT.TYPE', fnc.SysGetAttrValue('CoreMat'), '');
+
+  if (LayerCount <= 2) then
+  begin
+    SysRouteInsInstruction('Erp', 'LSR004', '');
+  end;
+
+
+end;
+
+procedure LaserRoutStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'LASER-D', '');
+  SysRouteInsWorkCenter('Erp', 'LASER-WC', '');
+  SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('LaserRoutName'), '');
+  SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('LaserRoutDate'), '');
+
+  begin
+    if (fnc.SysGetAttrValue('Allentown') = true) and
+      (fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType = ('Sub')) then
+    begin
+      SysRouteInsInstruction('Erp', 'LSR014', '');
+      SysRouteInsInstruction('Erp', 'LSR016', '');
+      SysRouteInsInstruction('Erp', 'LSR017', '');
+    end;
+  end;
+end;
+
+
+procedure RoutStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'ROUTNG-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'ROUTNG-D  ', '');
+  SysRouteInsInstruction('Erp', 'INS017', '');
+  SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('RoutPrgName'), '');
+  SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('RoutPrgDate'), '');
+  begin
+    if (fnc.SysGetAttrValue('Allentown') = true) and
+      (fnc.SysGetAttrValue('Cavity') = true) and
+      (MfgPartType = ('Sub')) then
+    begin
+      SysRouteInsInstruction('Erp', 'ROU017', '');
+      SysRouteInsAttribute('Erp', 'FILE NAME', fnc.SysGetAttrValue('RoutPrgName'), '');
+      SysRouteInsAttribute('Erp', 'FILE DATE', fnc.SysGetAttrValue('RoutPrgDate'), '');
+    end;
+  end;
+end;
+
+procedure SMStepDetails;
+begin
+  FindSM;
+  SysRouteInsDepartment('Erp', 'SMCOAT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SMCOAT-D  ', '');
+
+  if fnc.SysGetAttrValue('CrossReq') = true then
+  begin
+    SysRouteInsInstruction('Erp', 'SMK010', '');
+  end;
+
+  SysRouteInsAttribute('Erp', 'S/M Color', fnc.SysGetAttrValue('SMColor'), '');
+  SysRouteInsAttribute('Erp', '#S/M Layer', fnc.SysGetAttrValue('SMSides'), '');
+  SysRouteInsAttribute('Erp', 'Thickness', fnc.SysGetAttrValue('LayupThickness'), '');
+
+  if fnc.SysGetAttrValue('CrossReq') = true then
+  begin
+    SysRouteInsInstruction('Erp', 'SMK010', '');
+  end;
+end;
+
+procedure SMCureStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SMCURE-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SMCURE-D  ', '');
+  SysRouteInsAttribute('Erp', 'LayupThick', fnc.SysGetAttrValue('LayupThickness'), '');
+  SysRouteInsInstruction('Erp', 'CUR001    ', '');
+  begin
+    if ((fnc.SysGetAttrValue('FinishType') = 'ImmersionGold') or
+      (fnc.SysGetAttrValue('FinishType') = 'ImmersionTin')) then
+      SysRouteInsInstruction('Erp', 'CUR004', '');
+  end;
+end;
+
+procedure LegendStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SCREEN-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SCREEN-D  ', '');
+  SysRouteInsAttribute('Erp', 'Silk Color', fnc.SysGetAttrValue('LegendColor'), '');
+  SysRouteInsAttribute('Erp', '# Silks', fnc.SysGetAttrValue('LegendSides'), '');
+
+end;
+
+procedure ShipStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SHIPNG-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SHIPNG-D  ', '');
+  SysRouteInsAttribute('Erp', 'ShipMethod', fnc.SysGetAttrValue('ShipMeth'), '');
+end;
+
+procedure SilverFillStepDetails;
+begin
+  SysRouteInsDepartment('Erp', 'SILVER-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'SILVER-D  ', '');
+  if ((Fnc.SysGetAttrValue('SF') = 'TopSideFlat')) then //= true) and
+     //(Fnc.SysGetAttrValue('BotSideFlat')= false)) then
+  begin
+    SysRouteInsInstruction('Erp', 'SIL001    ', '');
+    SysRouteInsInstruction('Erp', 'SIL004    ', '');
+  end;
+  if //((Fnc.SysGetAttrValue('TopSideFlat')= false) and
+    ((Fnc.SysGetAttrValue('SF') = 'BotSideFlat')) then //= true)) then
+  begin
+    SysRouteInsInstruction('Erp', 'SIL002    ', '');
+    SysRouteInsInstruction('Erp', 'SIL005    ', '');
+  end;
+  if //((Fnc.SysGetAttrValue('TopSideFlat')= true) and
+     //(Fnc.SysGetAttrValue('BotSideFlat')= true)) then
+  ((Fnc.SysGetAttrValue('SF') = 'Both')) then //= true)) then
+  begin
+    SysRouteInsInstruction('Erp', 'SIL003    ', '');
+    SysRouteInsInstruction('Erp', 'SIL006    ', '');
+  end;
+end;
+
+procedure TinStripDetails;
+begin
+  SysRouteInsDepartment('Erp', 'CUPLAT-D  ', '');
+  SysRouteInsWorkCenter('Erp', 'TINSTRIP  ', '');
+  SysRouteInsInstruction('Erp', 'TST001    ', '');
+end;

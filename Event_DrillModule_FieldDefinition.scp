@@ -1,0 +1,62 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Drill Module
+//HeaderImportExport<--
+// ScriptGroup: DrillModule
+procedure AddFieldDef(tblFieldDef: TSysTable; KeyValue: string; FieldName: string; UpdateEnabled: Boolean; isVisible: boolean; DropDownValues: string);
+begin
+  tblFieldDef.Append;
+  tblFieldDef.FieldByName('KeyFieldValue').AsString := KeyValue;
+  tblFieldDef.FieldByName('FieldName').AsString := FieldName;
+  tblFieldDef.FieldByName('UpdateEnabled').AsBoolean := UpdateEnabled;
+  tblFieldDef.FieldByName('Visible').AsBoolean := isVisible;
+  tblFieldDef.FieldByName('DropDownValues').AsString := DropDownValues;
+  tblFieldDef.Post;
+end;
+
+procedure InitFieldDefinitions(ParamList: TStringList; tblFieldDef: TSysTable);
+var
+  HoleTypeList: string;
+begin
+  // assign the fieldname in the drill details table that drives the various definitions
+  ParamList.Values['KeyField'] := 'LayerName';
+
+  HoleTypeList := 'PLATED;NON_PLATED;VIA;PSlot;NSlot;Tool;Rout';            
+
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Tool', False, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'HoleType', True, True, 'PLATED;NON_PLATED;VIA;PSlot;NSlot;Tool;Rout');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Finish_Size', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Drill_Size', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Min_Tol', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Max_Tol', True, True, '');   
+  AddFieldDef(tblFieldDef, HoleTypeList, 'DrillType', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'NumHoles', True, True, '');      
+  AddFieldDef(tblFieldDef, HoleTypeList, 'TotNumHoles', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'ToolRef', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Notes', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'ToolUOM', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'Type2', True, True, '');                       
+  AddFieldDef(tblFieldDef, HoleTypeList, 'SlotRqd', True, True, '');
+  AddFieldDef(tblFieldDef, HoleTypeList, 'ToolStep', True, True, ''); 
+end;
+
+procedure UpdateVisibleFields(ParamList: TStringList);
+begin
+  {
+   This function is called on pushing 'Save' in the Create/Edit layers, you have the option
+   to Show/Hide fields in the inspector on the right-hand side, example, you have defined
+   annular ring by-tool-by-layer, then you only want to hide all the fixed defined annular
+   ring fields for layers higher then the current layercount.
+  }  
+end;
+
+procedure DrillModule_FieldDefinition(ParamList: TStringList; tblFieldDef: TSysTable);
+begin
+  if LowerCase(ParamList.Values['Func']) = 'init' then
+    InitFieldDefinitions(ParamList, tblFieldDef);
+
+  if LowerCase(ParamList.Values['Func']) = 'updatevisible' then
+    UpdateVisibleFields(ParamList);
+end;

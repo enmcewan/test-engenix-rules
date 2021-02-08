@@ -1,0 +1,225 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details User Event Scripts
+//HeaderImportExport<--
+// This script is used to obtain customer name, part number and revision from iQuote.                                                                                          
+// The script connects to iQuote database and displays iQUote information in a data grid.
+// Information displayed in the datagrid can be configured in procedure GetiQuoteData.
+// User can either select iQuote part or type in quote number to obtain relevant information.
+// Swap part A and B located in procedure GetiQuoteData based on preferred selection order.
+// Call procedure UpdateJobDataFromiQuote to execute this script.
+
+
+// Obtain iQuote connection setting from Engenix SystemSettings table.
+uses
+  ParadigmLibrary;
+  
+Function GetiQuoteConnectionString: String;
+var
+   qryConnectString: TAdoQuery;
+Begin
+   result := '';
+
+   // Create the Query
+   qryConnectString := TAdoQuery.Create(nil);
+
+   // Connect to the Engenix DataBase
+   qryConnectString.Connection := Fnc.DBConnection;
+
+   // Sql what to grab connection string
+   qryConnectString.Sql.Add('SELECT' +
+                           ' SystemSettings.SettingName ' +
+                           ',SystemSettings.SettingValue ' +
+                           ' FROM' +
+                           ' SystemSettings');
+
+   // Commit the Sql/Retrieve the data from the Engenix DataBase
+   qryConnectString.Open;
+
+   // Locate iQuote connection string.
+   qryConnectString.Locate('SettingName', 'iQuoteConnectionString',  SetOf([]));
+   Result := qryConnectString.FieldByName('SettingValue').AsString;
+
+   // Close the Query
+   qryConnectString.Close;
+   // What we create, we have to free/destroy
+   qryConnectString.Free;
+end;
+
+// SQL to query iQuote database. Set filters and display result in the grid.
+// Obtain quote number and rev through user selection or manual entry.
+function GetiQuoteData: TSysTable;
+var
+  QuoteNum: String;
+  QuoteRev: String;
+  QryStr: string;
+  OptionList: TStringList;
+  QuoteQry: TAdoQry;
+begin
+  QuoteNum := '';
+  QuoteRev := '';
+
+  // SQL to fetch data in data grid.
+  QryStr :=  'SELECT RFQs.BaseQuoteNumber as Quote_Number, '+
+                    'RFQs.QuoteRevision as Quote_Rev,      '+
+                    'Customers.Name as Customer_Name,      '+
+                    'RFQs.PartNumber as Part_Number,       '+
+                    'RFQs.Revision as Part_Rev,             '+
+                    'Customers.CustomerID as Customer_Code '+
+             'FROM '+
+                    'RFQs INNER JOIN       '+
+                    'Customers ON RFQs.CustomerInc = Customers.CustomerInc ' +
+                    'Order by  RFQs.BaseQuoteNumber ';
+
+  QuoteQry := TadoQuery.Create(nil);
+  QuoteQry.ConnectionString := GetiQuoteConnectionString;
+  QuoteQry.Sql.Add(QryStr);
+  QuoteQry.Open;
+
+  // Fnc.OpenDataGrid(QuoteQry, nil, nil, True);  // Debug statement
+
+  // Swap Part A and Part B as per use preference.
+  if QuoteQry = nil then
+     showmessage('No Quote found. Check iQuote connectivity.')
+  else
+  //////////////////////////////////////
+  ////  Part A Data Grid Selection /////
+  //////////////////////////////////////
+  begin
+     QuoteQry.First;
+     // Added Display Options
+     OptionList := TStringList.Create;
+     OptionList.Add('KeyField=Quote_Number');
+     OptionList.Add('ColumnSearch=Yes');
+     if Fnc.OpenDataGrid(QuoteQry, OptionList, nil, true) = 1 then
+     begin
+        QuoteNum := QuoteQry.FieldByName('Quote_Number').AsString;
+        QuoteRev := QuoteQry.FieldByName('Quote_Rev').Value;
+     end;
+     OptionList.Free;
+  end;
+  // End of Part A
+
+
+  // Option to key-in quote number and rev.
+  if (QuoteNum = '') then
+
+
+  //////////////////////////////////////
+  ////  Part B Manual quote entry  /////
+  //////////////////////////////////////
+  begin
+
+    QuoteNum := InputBox('Engenix', 'Enter iQuote quote number.', '');
+   //  Loop back till user enters Quote no. and Rev. as an integer.
+    if QuoteNum <> '' then
+    begin
+      while (StrToIntDef(QuoteNum, -1) = -1) do
+        QuoteNum := InputBox('Engenix', 'iQuote quote number must be an integer.', '');
+
+      QuoteRev := InputBox('Engenix', 'Enter iQuote quote revision.', '');
+      if QuoteRev <> '' then
+        while (StrToIntDef(QuoteRev, -1) = -1) do
+          QuoteRev := InputBox('Engenix', 'iQuote quote revision must be an integer.', '');
+    end;
+  end;
+  // End of Part B
+
+  Result := nil;
+  if QuoteNum <> '' then
+  begin
+  QryStr :=  'SELECT RFQs.BaseQuoteNumber as Quote_Number, '+
+                    'RFQs.QuoteRevision as Quote_Rev,      '+
+                    'Customers.Name as Customer_Name,      '+
+                    'RFQs.PartNumber as Part_Number,       '+
+                    'RFQs.Revision as Part_Rev,            '+
+                    'Customers.CustomerID as Customer_Code '+
+
+             'FROM '+
+                    'RFQs INNER JOIN       '+
+                    'Customers ON RFQs.CustomerInc = Customers.CustomerInc ' +
+
+             'WHERE  RFQs.BaseQuoteNumber=' + QuotedStr(QuoteNum) + ' and ' +
+                     'RFQs.QuoteRevision='  + QuotedStr(QuoteRev) + ' ; ';
+
+    QuoteQry := TadoQuery.Create(nil);
+    QuoteQry.ConnectionString := GetiQuoteConnectionString;
+
+    QuoteQry.Sql.Add(QryStr);
+    QuoteQry.Open;
+    Result := QuoteQry;
+
+    if QuoteQry.RecordCount = 0 then
+    begin
+       Result.Close;
+       Result.Free;
+       Result := nil;
+    end;
+  end;
+
+end;
+
+procedure UpdateJobDataFromiQuote;
+var
+  iQuoteQry: TSysTable;
+  CustomerId: integer;
+  PartNumId: integer;
+  JobParamList: TStringList;
+
+begin
+  Fnc.MouseBusy;
+  iQuoteQry :=  GetiQuoteData;
+  //  Fnc.OpenDataGrid(iQuoteQry, nil, nil, True);   // Debug statetement.
+
+  if iQuoteQry = nil then
+    showmessage('No valid quote number selected.')
+  else
+  begin
+    iQuoteQry.First;
+
+    // Insert/Check for the customer in the Engenix DataBase
+    CustomerId := SysEngnxCheckCustomer(true, iQuoteQry.FieldByName('Customer_Name').AsString,
+                                              '',
+                                              iQuoteQry.FieldByName('Customer_Code').AsString);
+
+    if CustomerId <> 0 then
+    begin
+      // Check/Insert the Customer Part Number
+      PartNumId := SysEngnxCheckCustPart(
+                          true, CustomerId,
+                          iQuoteQry.FieldByName('Part_Number').Value,
+                          '',
+//                          iQuoteQry.FieldByName('Customer_Part_Desc').Value,  // Usually not populated in iQuote
+                          iQuoteQry.FieldByName('Part_Rev').Value);
+    end;
+
+    // if valid CustId + CustPartNumId then update Job
+    if (CustomerId <> 0) and (PartNumId <> 0) then
+    begin
+      // Update the JobRecord
+      JobParamList := TStringList.Create;
+      JobParamList.Add('CustomerId=' + IntToStr(CustomerId));
+      JobParamList.Add('PartNumberId=' + IntToStr(PartNumId));
+      JobParamList.Add('BaseQuoteNumber=' + iQuoteQry.FieldByName('Quote_Number').AsString);
+      JobParamList.Add('QuoteRevision=' + iQuoteQry.FieldByName('Quote_Rev').AsString);
+
+      SysEngnxUpdateJob(JobParamList);
+      JobParamList.Free;
+    end;
+
+    iQuoteQry.Close;
+    iQuoteQry.Free;
+    Fnc.RefreshJobData;
+  end;
+
+  Fnc.MouseNormal;
+
+
+end;
+
+procedure StackupUserEvent2(ParamList: TStringList);
+begin
+  UpdateJobDataFromiQuote;
+end;

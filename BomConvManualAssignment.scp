@@ -1,0 +1,74 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=BOM Conversion
+//HeaderImportExport<--
+{
+- ParamList.Values['Func'] := 'Assign' or 'Insert'
+
+Function as performed by the user, 'Insert' is dragging a material from the Erp list
+into the Spec.Bom, 'Assign' is assigning an Erp material to one or more existing
+Spec.Bom items
+
+- ParamList.Values['Abort'] := 'True' or 'False'
+
+Update the value in this script to proceed ('False') or abort ('True') the user action
+
+-----
+
+- ErpMatrlList.Values['Prime_ErpId'], ErpMatrlList.Values['Prime_InvPartNum']
+  ErpMatrlList.Values['Prime_InvPartDesc']
+  
+Selected Erp material that will be assigned to the selected Bom items. The value for
+ErpMatrlList.Values['Prime_ErpId'] can be updated in this script to assign another 
+material.
+                      
+- ErpMatrlList.Values['Alt_ErpId'], ErpMatrlList.Values['Alt_InvPartNum']
+  ErpMatrlList.Values['Alt_InvPartDesc']
+                                                        
+Same as the 'Prime_..' parameters but now for the Alternative mataeirls
+
+-----
+                            
+- DestMatrlList.Strings[i]    
+                       
+This is the list of generic material pointers that are selected for updating. The
+details for each material can be checked by positioning at the generic material.
+
+  Fnc.SysMaterialsTable.Locate('RecId', DestMatrlList.Strings[i], [])
+}
+
+
+procedure ValidateManualAssignment(ParamList: TStringList; ErpMatrlList: TStringList; DestMatrlList: TStringList);
+var
+ i : integer;
+ ERP_Family : string;
+begin
+
+  ERP_Family := copy(ErpMatrlList.strings[1],18,3);
+  ShowMessage(ERP_Family);
+
+  //ShowMessage(DestMatrlList.Text);
+  //Fnc.SysMaterialsTable.Locate('RecId', DestMatrlList.Strings[i], []);
+
+  if Fnc.SysGetAttrValueTopLevel('Spec') = 'Military Build' then
+  begin
+    for i := 0 to DestMatrlList.Count -1 do
+    begin
+      ParamList.Values['Abort'] := 'False';
+
+      if ERP_Family = 'LAR' then
+      begin
+        ParamList.Values['Abort'] := 'True';
+        MessageDlg('MIC Material cannot be used for military jobs. Operation aborted', mtError, Setof([mbOK]), 0);
+      end
+      //ShowMessage(DestMatrlList.Strings[i]);
+      //Fnc.SysMaterialsTable.Locate('MaterialsID', DestMatrlList.Strings[i], SetOf([loCaseInsensitive]));
+      //ShowMessage(Fnc.SysMaterialsTable.FieldByName('Family').AsString);
+      //Fnc.OpenDataGrid(Fnc.SysMaterialsTable);
+    end;
+  end;
+end;
+
+

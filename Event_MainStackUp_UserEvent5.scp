@@ -1,0 +1,33 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Job Details User Event Scripts
+//HeaderImportExport<--
+procedure ExportImpedanceToXml;
+var
+  ParamList: TStringList;
+  aMessage: string;
+begin
+  ParamList := TStringList.Create;
+     
+  // mandatory parameters
+  ParamList.Values['FileName'] := 'c:\tmp\ImpOut.xml';
+  ParamList.Values['PartNumber'] := Fnc.JobName;
+  ParamList.Values['Date'] := FormatDateTime('yyyy/mm/dd HH:MM:SS', Now);
+
+  // optional parameters
+//  ParamList.Values['UnitId'] := '1';
+
+  if Fnc.ImpedanceToXmlExportPolar(ParamList) then
+    MessageDlg('Export successful' + #13#13 + 'FileName: ' + ParamList.Values['FileName'], mtInformation, SetOf([mbOk]), 0)
+  else
+    MessageDlg('Export failed' + #13#13 + 'FileName: ' + ParamList.Values['FileName'], mtWarning, SetOf([mbCancel]), 0);
+  ParamList.Free;   
+end;
+
+
+procedure StackupUserEvent5(ParamList: TStringList);
+begin
+  ExportImpedanceToXml;  
+end;                                                                                             

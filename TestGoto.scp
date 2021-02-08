@@ -1,0 +1,24 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+var            
+  i : Integer;
+
+label
+  GotoLabel;
+
+begin
+  for i := 1 to 10 do
+  begin
+    ShowMessage('i = '+IntToStr(i));
+
+    if i = 4 then Goto GotoLabel;   // Conditionally exit the loop
+  end;
+
+  ShowMessage('The loop finished OK');
+GotoLabel:
+  ShowMessage('Loop finished with i = '+IntToStr(i));
+end;

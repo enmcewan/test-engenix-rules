@@ -1,0 +1,255 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Plating
+//HeaderImportExport<--
+{
+  ---------------------------------------------------------------------------
+  ---> Script to calculate the actual thickness of the copper layer.     <---
+  ---------------------------------------------------------------------------
+  ParamList (all input):
+
+  - ParamList.Values['LayerName'] = Name of the layer
+  - ParamList.Values['MfgPartType'] = MfgPart type for this layer
+
+  ---------------------------------------------------------------------------
+  LayupParamTabl:
+
+  Table to be updated with the actual thickness of the layer
+  ---------------------------------------------------------------------------
+  tblDrillParam:
+
+  Additional details for each drill layer used on manufacturing this MfgPart.
+
+  ---------------------------------------------------------------------------
+  tblConductors:
+
+  Table with all the conductors as defined in the system
+
+  ---------------------------------------------------------------------------
+  tblSpec
+
+  Specs and Capabilities linked to the Job
+
+  ---------------------------------------------------------------------------
+}
+
+Function GetPlatingThickness(Thickness, PTH, PTHSpec, Laser, LaserDia, LaserSpec, LaserMat, Technology, AddReqs: string): float;
+var
+  Excelquery: TadoQuery;
+//  Thickness, PTH, PTHSpec, Laser, LaserDia, LaserSpec, LaserMat, Technology, AddReqs: string;
+  //PlatedThickness: double;
+begin
+  result := 0;
+  // Create the Query object
+  Excelquery := TadoQuery.Create(nil);
+  // Specify the Excel file we want to read
+  Excelquery.ConnectionString := 'Provider=Microsoft.Jet.OLEDB.4.0' +
+    ';Data Source =c:\Plating\Plated Cu thickness_HDI.xls' +
+    ';Extended Properties=Excel 8.0';
+  // Be sure the Query is closed, and clear the Sql command string
+  Excelquery.Close;
+  Excelquery.Sql.Clear;
+  // Specify the Sql command, can be spread over multiple ‘Add’ lines
+  Excelquery.Sql.Add('SELECT * FROM [D.(SSS.H.Kapitel 5.9)-01G$]');
+  // Open the Query, this will open the Excel file, and get the data from the specified sheet
+  Excelquery.Open;
+  // Show what we have got
+  //Fnc.OpenDataGrid(Excelquery);
+
+{  Thickness := '> 0,3 mm';
+  PTH := '---';
+  PTHSpec := '---';
+  Laser := '---';
+  LaserDia := '---';
+  LaserSpec := '---';
+  LaserMat := '---';
+  Technology := 'Filled Via';
+  AddReqs := '';
+}
+
+//  PlatedThickness := 0;
+
+  with Excelquery do
+  begin
+    first;
+    next; //skip header
+    next; //skip header
+
+    while not Eof do
+    begin
+      //ShowMessage(FieldByName('F3').AsString);
+      //ShowMessage(FieldByName('F4').AsString);
+
+      if (trim(FieldByName('F3').AsString) = Thickness) and
+         (trim(FieldByName('F4').AsString) = PTH) and
+         (trim(FieldByName('F5').AsString) = PTHSpec) and
+         (trim(FieldByName('F6').AsString) = Laser) and
+         (trim(FieldByName('F7').AsString) = LaserDia) and
+         (trim(FieldByName('F8').AsString) = LaserSpec) and
+         (trim(FieldByName('F9').AsString) = LaserMat) and
+         (trim(FieldByName('F10').AsString) = Technology) and
+         (trim(FieldByName('F11').AsString) = AddReqs) then
+      begin
+        result := FieldByName('F13').AsFloat;
+        //ShowMessage(result);
+        Break;
+      end;
+      Next;
+    end;
+  end;
+
+ // Cleanup things if no longer needed
+  Excelquery.Close;
+  Excelquery.Free;
+end;
+
+function GetThicknessString(ThicknessVal : float): string;
+begin
+  Result := '';
+  ThicknessVal := ThicknessVal * 25.4; //convert data for testing only
+  //ShowMessage(ThicknessVal);
+  If ThicknessVal <= 999.00 then Result := '> 1,65mm - 2,0mm'; //trap bad values
+  If ThicknessVal <= 2.00 then Result := '> 1,65mm - 2,0mm';
+  If ThicknessVal <= 1.65 then Result := '> 1,4mm - =< 1,65mm';
+  If ThicknessVal <= 1.40 then Result := '> 1,21mm - =< 1,4mm';
+  If ThicknessVal <= 1.21 then Result := '> 0,7 - =< 1,21 mm';
+  If ThicknessVal <= 0.70 then Result := '> 0,3 - < = 0,7 mm';
+  If ThicknessVal <= 0.30 then Result := '=< 0,3 mm';
+end;
+
+
+
+function GetThickness(CondType: string; CondCode: string): float;
+begin
+  Result := 0;
+
+  if Fnc.SysMaterialsConductors.Locate(
+                      'Type;Code',
+                      [CondType, CondCode],
+                       SetOf([])) then
+    Result := Fnc.SysMaterialsConductors.FieldByName('Thickness').AsFloat;
+end;
+
+procedure ThicknessCalcLayer(ParamList: TStringList; tblLayupParam: TSysTable; tblDrillParam: TSysTable; tblConductors: TSysTable; tblSpec: TSysTable);
+var
+  DrillLayerName : string;
+  firstDrillLayer : boolean;
+  ThicknessVal: float;
+  SpreadSheetThickness: float;
+
+  Thickness: string;
+  PTH: string;
+  PTHSpec: string;
+  Laser: string;
+  LaserDia: string;
+  LaserSpec: string;
+  Technology: string;
+  AddReqs: string;
+begin
+
+  Thickness := '';
+  PTH := '';
+  PTHSpec := '';
+  Laser := '';
+  LaserDia := '';
+  LaserSpec := '';
+  Technology := '';
+  AddReqs := '';
+
+ // fnc.opendatagrid(Fnc.SysLayupParamTable);
+  with Fnc.SysLayupParamTable do
+  begin
+   // Fnc.OpenDataGrid(Fnc.SysLayupParamTable);
+    if Locate('ActiveRecord', True,  SetOf([])) then
+    begin
+      Edit;
+      firstDrillLayer := true;
+      tblDrillParam.First;
+      // Fnc.OpenDataGrid(tblDrillParam);
+      while (not tblDrillParam.Eof) do
+      begin
+        // Base Copper Calculation
+        if FieldByName('LayupCodeThckCu').AsString <> '' then
+          FieldByName('LayupThckCu').AsFloat :=
+                   GetThickness('Copper', FieldByName('LayupCodeThckCu').AsString);
+
+        DrillLayerName := tblDrillParam.FieldByName('DrillLayerName').AsString;
+        if (firstDrillLayer) or (DrillLayerName <> tblDrillParam.FieldByName('DrillLayerName').AsString) then
+        begin
+
+          if tblDrillParam.FieldByName('DrillType').AsInteger = 1 then  //Laser
+          begin
+            if FieldByName('LayupCodeThckCu').AsString = '.5' then
+              FieldByName('LayupThckCu').AsFloat := 0.0005;
+
+            if FieldByName('LayupCodeThckCu').AsString = '1' then
+              FieldByName('LayupThckCu').AsFloat := 0.0009;
+          end;
+
+          //Set Generic Variables
+        ThicknessVal := tblDrillParam.FieldByName('DrillThickness').AsFloat;
+        Thickness := GetThicknessString(ThicknessVal);
+
+        if tblDrillParam.FieldByName('DrillType').AsInteger = 0 then  //PTH
+        begin
+          PTH := 'X';
+          ShowMessage('PTH = ' + Laser);
+        end;
+
+        if tblDrillParam.FieldByName('DrillType').AsInteger = 1 then  //Laser
+        begin
+           Laser := 'X';
+           ShowMessage('Laser = ' + Laser);
+        end;
+
+        SpreadSheetThickness := GetPlatingThickness(Thickness,'---','---','---','---','---','---','Filled Via','');
+        if SpreadSheetThickness > 0 then
+        begin
+          FieldByName('LayupThckPlating').AsFloat := (SpreadSheetThickness / 25400); //covert to inches for testing
+          ShowMessage(FieldByName('LayupThckPlating').AsFloat);
+         // ShowMessage( FieldByName('LayupThckCu').AsFloat);
+        end
+        else
+        // Plating Calculation, only if set to Automatic
+          if FieldByName('LayupCodeThckPlating').AsString <> '' then
+            FieldByName('LayupThckPlating').AsFloat := GetThickness('Plating', FieldByName('LayupCodeThckPlating').AsString);
+
+      end;
+
+        firstDrillLayer := false;
+        tblDrillParam.Next;
+
+      end;
+      //   Fnc.OpenDataGrid(tblLayupParam);
+         //Thickness := '> 0,3 mm'; GetDrilledThickness  from DrillParam
+         {PTH := '---';  // Loop thru drill table for PTH, is Found then PTH = 'true'
+         PTHSpec := '---';  // Get Spec
+         Laser := '---';   // Loop thru drill table for Laser, is Found then Laser = 'true'
+         LaserDia := '---';  // IF Laser get Drilll Size
+         LaserSpec := '---';   // Get Spec (Same as above)
+         LaserMat := '---';    //If Laser get Materials Lasered
+         Technology := 'Filled Via'; Get "Filled Via Type"
+         AddReqs := '';  // Get Additional Spec
+       }
+      // Call spreadsheet lookup
+      // If LookupSpreadsheet gets a value then thickness = spreadsheet value
+
+
+      // Nickel Calculation
+      if FieldByName('LayupCodeThckNi').AsString <> '' then
+        FieldByName('LayupThckNi').AsFloat :=
+                 GetThickness('Nickel', FieldByName('LayupCodeThckNi').AsString);
+
+      // Gold Calculation
+      if FieldByName('LayupCodeThckAu').AsString <> '' then
+        FieldByName('LayupThckAu').AsFloat :=
+                 GetThickness('Gold', FieldByName('LayupCodeThckAu').AsString);
+
+      Post;
+    end;
+
+  end;
+
+end;

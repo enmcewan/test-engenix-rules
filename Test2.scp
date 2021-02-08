@@ -1,0 +1,31 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+procedure ReadTextFile;
+
+var
+  Txt: TextFile;
+  s: string;                                                                                                                                                                
+  AllText: string;
+
+begin
+  AllText := '';
+  AssignFile(Txt, 'E:\TempFiles\test.txt');
+  Reset(Txt);
+  while not Eof(Txt) do
+  begin
+    Readln(Txt);
+    AllText := AllText + s;
+
+    // Write out each line; comment out to stop.
+    Writeln(s);
+  end;
+  CloseFile(Txt);
+
+  // Write out all content as a single string.
+  WriteLn(AllText); 
+  ReadLn;
+end

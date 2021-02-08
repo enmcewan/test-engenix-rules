@@ -1,0 +1,16 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Drill Module
+//HeaderImportExport<--
+procedure DrillModule_PostEdit(ParamList: TStringList; tblDrillTools: TSysTable; tblLayers: TSysTable);
+begin
+
+  if lowercase((tblDrillTools.FieldByName('HoleType').AsString) = 'VIA') then
+       ParamList.Values['Color;' + 'HoleType'] := StrToInt(clYellow);
+         
+  if lowercase((tblDrillTools.FieldByName('DRILL_SIZE').AsFloat) < 0.008) then
+       ParamList.Values['Color;' + 'HoleType'] := StrToInt(clRed);  
+       
+end;                   

@@ -1,0 +1,35 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Attribute Edit
+//HeaderImportExport<--
+procedure FlipAttribute(AttrName: string; doHide: boolean);
+begin
+  Fnc.SysAttrEditSetAttrValue(AttrName, '', doHide);
+end;
+
+procedure AttrEdit_AfterEdit(ParamList: TStringList; AttrTable: TSysTable; SpecTable: TSysTable);
+var
+  doHide: boolean;              
+  AttrName: string;
+begin
+  //showmessage('Running After Edit');
+
+  AttrName := LowerCase(ParamList.Values['AttrName']);
+  {
+  if AttrName = 'boardsizex' then
+  begin
+    doHide := AttrTable.FieldByName('AttrValue').AsFloat > 8;
+                                                       
+    FlipAttribute('MfgLeadTime', doHide);
+    FlipAttribute('OptimalLotSize', doHide);
+    FlipAttribute('ProdCode', doHide);
+    FlipAttribute('RouteCode', doHide);
+
+  //  FlipAttribute('ScreenColor', doHide);
+  //  FlipAttribute('ScreenThickness', doHide);
+  //  FlipAttribute('Smk_Color', doHide);
+  end;
+  }
+end;                              

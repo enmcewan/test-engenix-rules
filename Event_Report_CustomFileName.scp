@@ -1,0 +1,11 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Reports
+//HeaderImportExport<--
+procedure Report_CustomFileName(ParamList: TStringList);
+begin
+  // ParamList.Values['FilePath'] := a customized directory
+  // ParamList.Values['FileName'] := a customized filename
+end;

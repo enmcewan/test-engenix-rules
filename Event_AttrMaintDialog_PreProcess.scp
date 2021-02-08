@@ -1,0 +1,32 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=1
+//ScriptGroup=Dialog Start/Stop
+//HeaderImportExport<--
+{
+  This script is executed just before the Attribute Grid is opened.
+  You can use the Fnc.SysGetAttr... and SysSetAttr.... functions in
+  here to pre-process any attribute values before the Grid is opened
+}
+
+procedure SetPDMEmployeeCode
+var
+    empCode : string;
+    
+begin
+    empCode := '';
+    
+    case Fnc.GetLoggedInUserName of
+        'Admin' : empCode := 'ADMIN';
+        //Add remaining user to Emp Code mappings
+    end;
+    
+    Fnc.SysSetAttrValue('UserName', empCode);
+
+end;
+begin
+    Fnc.SysSetAttrValue('ResistType','Type 3');
+    Fnc.SysSetAttrValueForMfgPart(1,'ResistType','Type 3');
+    SetPDMEmployeeCode;
+end;

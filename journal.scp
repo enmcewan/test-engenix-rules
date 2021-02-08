@@ -1,0 +1,32 @@
+//HeaderImportExport-->
+//SiteId=0
+//Enterprise=True
+//ScriptType=0
+//ScriptGroup=
+//HeaderImportExport<--
+var
+  Qry : TADOQuery;
+  tbl : TSysTable;
+
+  lastJob : integer;
+  currentJob : integer;
+
+  jobAttributes : TSysTable;
+
+begin
+
+  Qry := TAdoQuery.Create(nil);
+  Qry.Connection := Fnc.DbConnection;
+
+  Qry.SQL.Add('SELECT Description from JobJournal where JobJournalID = 26052');
+  // Qry.SQL.Add('SELECT * from JobAnswers WHERE JobID = 2022');
+  // Qry.SQL.Add('SELECT JobName from Jobs WHERE JobID = 2022');
+
+  Qry.Open 
+  
+  tbl := qry;
+  
+  Fnc.OpenDataGrid(tbl);
+  
+  
+end 
