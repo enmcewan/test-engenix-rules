@@ -33,7 +33,7 @@ begin
   SysRouteInsAttribute('Erp', 'Cu TANK', '  ', '');
   SysRouteInsAttribute('Erp', 'TIME', '  ', '');
 
-  SysRouteInsCosting('Erp', 5, 'CostProcess', 0.25, '');
+  SysRouteInsCosting('Erp', 5, 'CostProcess', 0.29, '');
 
 end;
 
